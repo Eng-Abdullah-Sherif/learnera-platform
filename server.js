@@ -68,10 +68,11 @@ function homePath(role) {
 }
 
 // Landing page for guests; signed-in users go straight to their home.
+// The welcome page lives at the project root (index.html).
 app.get('/', (req, res) => {
   const user = currentUser(req);
   if (user) return res.redirect(homePath(user.role));
-  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.get('/login', (req, res) => {
