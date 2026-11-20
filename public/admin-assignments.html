@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assignments · LearnEra</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" data-i18n="common.roleAdmin">Administrator</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page page-wide">
+    <a class="back-link" href="/admin" data-i18n="adminAssignments.backToAdmin">&larr; Back to admin</a>
+
+    <div class="page-head">
+      <div>
+        <h1 data-i18n="adminAssignments.title">Assignments</h1>
+        <p data-i18n="adminAssignments.subtitle">Publish a homework task with its due date, grade and attached files.</p>
+      </div>
+      <button class="btn btn-primary" id="addBtn" type="button" data-i18n="adminAssignments.add">+ Add assignment</button>
+    </div>
+
+    <div class="filter-banner" id="courseFilter" style="display: none;">
+      <span id="courseFilterText"></span>
+      <a class="btn btn-ghost btn-sm" href="/admin/assignments" data-i18n="adminAssignments.showAll">Show all courses</a>
+    </div>
+
+    <section class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="adminAssignments.thAssignment">Assignment</th>
+              <th data-i18n="adminAssignments.thCourse">Course</th>
+              <th data-i18n="adminAssignments.thDueDate">Due date</th>
+              <th data-i18n="adminAssignments.thMaxGrade">Max grade</th>
+              <th data-i18n="adminAssignments.thFiles">Files</th>
+              <th data-i18n="adminAssignments.thSubmissions">Submissions</th>
+              <th data-i18n="adminAssignments.thActions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="assignmentsBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyState" style="display: none;" data-i18n="adminAssignments.empty">No assignments yet. Add your first one.</div>
+    </section>
+  </main>
+
+  <!-- Add / edit assignment modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="modalTitle" data-i18n="adminAssignments.addTitle">Add assignment</h3>
+        <button class="modal-close" id="closeModal" type="button">&times;</button>
+      </div>
+
+      <form id="assignmentForm">
+        <div class="modal-body">
+          <div id="formError" class="alert alert-error"></div>
+
+          <div class="field">
+            <label for="fCourse" data-i18n="adminAssignments.course">Course</label>
+            <select id="fCourse" name="course_id" required></select>
+            <div class="hint" style="text-align:left; margin-top:6px;" data-i18n="adminAssignments.courseHint">Only students enrolled in this course will see the assignment.</div>
+          </div>
+
+          <div class="field">
+            <label for="fTitle" data-i18n="adminAssignments.fieldTitle">Title</label>
+            <input type="text" id="fTitle" name="title" required data-i18n-placeholder="adminAssignments.titlePlaceholder" placeholder="e.g. Chapter 3 exercises" />
+          </div>
+
+          <div class="field">
+            <label for="fDescription"><span data-i18n="adminAssignments.description">Description</span> <span class="muted" data-i18n="adminAssignments.optional">(optional)</span></label>
+            <textarea id="fDescription" name="description" rows="3" data-i18n-placeholder="adminAssignments.descriptionPlaceholder" placeholder="Instructions for the students"></textarea>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="fDueDate" data-i18n="adminAssignments.dueDate">Due date</label>
+              <input type="date" id="fDueDate" name="due_date" required />
+            </div>
+            <div class="field">
+              <label for="fMaxGrade" data-i18n="adminAssignments.maxGrade">Maximum grade</label>
+              <input type="number" id="fMaxGrade" name="max_grade" min="1" max="1000" step="1" value="10" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label data-i18n="adminAssignments.attachedFiles">Attached files</label>
+            <div id="existingFiles" class="file-list"></div>
+            <input type="file" name="files" id="filesInput" multiple />
+            <div class="hint" style="text-align:left; margin-top:6px;" data-i18n="adminAssignments.uploadLimit">Up to 10 files, 15 MB each. Any file type is accepted.</div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="cancelBtn" data-i18n="common.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn" data-i18n="common.save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/admin-assignments.js"></script>
+</body>
+</html>

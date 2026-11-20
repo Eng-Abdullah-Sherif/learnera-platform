@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Courses · LearnEra</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" id="topRole" data-i18n="common.roleInstructor">Instructor</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button" data-i18n="common.signOut">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page page-wide">
+    <section class="profile-card">
+      <div class="profile-photo" id="profilePhoto"></div>
+      <div class="profile-info">
+        <h1 id="profileName">…</h1>
+        <span class="pill instructor" data-i18n="common.roleInstructor">Instructor</span>
+        <p class="profile-email" id="profileEmail"></p>
+      </div>
+    </section>
+
+    <div class="page-head" style="margin-top: 30px;">
+      <div>
+        <h2 class="section-title" data-i18n="instructor.coursesTitle">Assigned courses</h2>
+        <p data-i18n="instructor.coursesSubtitle">Open a course to view its students, attendance, completion and assignments.</p>
+      </div>
+    </div>
+
+    <section class="courses-grid" id="coursesGrid"></section>
+    <div class="card empty" id="coursesEmpty" style="display: none;" data-i18n="instructor.coursesEmpty">
+      No courses have been assigned to you yet. Ask an administrator to assign your courses.
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/instructor.js"></script>
+</body>
+</html>

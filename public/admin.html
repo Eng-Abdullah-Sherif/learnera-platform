@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin · LearnEra</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" data-i18n="common.roleAdmin">Administrator</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button" data-i18n="common.signOut">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page page-wide">
+    <div class="page-head">
+      <div>
+        <h1 data-i18n="admin.coursesTitle">Available courses</h1>
+        <p data-i18n="admin.coursesSubtitle">Create a course with its days, then open it to take attendance.</p>
+      </div>
+      <button class="btn btn-primary" id="addCourseBtn" type="button" data-i18n="admin.addCourse">+ Add course</button>
+    </div>
+
+    <section class="courses-grid" id="coursesGrid"></section>
+    <div class="card empty" id="coursesEmpty" style="display: none;" data-i18n="admin.coursesEmpty">No courses yet. Add your first course.</div>
+
+    <div class="page-head" style="margin-top: 42px;">
+      <div>
+        <h1 data-i18n="admin.accountsTitle">Accounts</h1>
+        <p data-i18n="admin.accountsSubtitle">Create and manage all learner and administrator accounts.</p>
+      </div>
+      <button class="btn btn-primary" id="addBtn" type="button" data-i18n="admin.addAccount">+ Add account</button>
+    </div>
+
+    <section class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="admin.tableUser">User</th>
+              <th data-i18n="admin.tableRole">Role</th>
+              <th data-i18n="admin.tableCourse">Enrolled course</th>
+              <th data-i18n="admin.tableAttendance">Attendance</th>
+              <th data-i18n="admin.tableAbsence">Absence</th>
+              <th data-i18n="admin.tableCompletion">Completion</th>
+              <th data-i18n="admin.tableActions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyState" style="display: none;" data-i18n="admin.accountsEmpty">No accounts yet.</div>
+    </section>
+
+    <div class="page-head" style="margin-top: 42px;">
+      <div>
+        <h1 data-i18n="admin.certificatesTitle">Certificates</h1>
+        <p data-i18n="admin.certificatesSubtitle">Issue completion certificates to students and manage them here.</p>
+      </div>
+      <button class="btn btn-primary" id="addCertificateBtn" type="button" data-i18n="admin.addCertificate">+ Add certificate</button>
+    </div>
+
+    <section class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="admin.certStudent">Student</th>
+              <th data-i18n="admin.certCourse">Course</th>
+              <th data-i18n="admin.certTitleCol">Certificate</th>
+              <th data-i18n="admin.certIssued">Issue date</th>
+              <th data-i18n="admin.tableActions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="certificatesBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="certificatesEmpty" style="display: none;" data-i18n="admin.certificatesEmpty">No certificates yet.</div>
+    </section>
+
+    <section id="liveLogSection" style="margin-top: 42px;">
+      <div class="page-head">
+        <div>
+          <h1 data-i18n="liveLog.title">Live sessions log</h1>
+          <p data-i18n="liveLog.subtitle">Who attended each live session, when they joined and left, and how much of it they completed.</p>
+        </div>
+      </div>
+      <section class="live-log-list" id="liveLogList"></section>
+      <div class="card empty" id="liveLogEmpty" style="display: none;" data-i18n="liveLog.empty">No live sessions have been held yet.</div>
+    </section>
+  </main>
+
+  <!-- Add / edit account modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="modalTitle">Add account</h3>
+        <button class="modal-close" id="closeModal" type="button">&times;</button>
+      </div>
+
+      <form id="userForm">
+        <div class="modal-body">
+          <div id="formError" class="alert alert-error"></div>
+
+          <div class="field">
+            <label data-i18n="common.profilePhoto">Profile photo</label>
+            <div class="photo-preview">
+              <div id="photoPreview"></div>
+              <input type="file" name="photo" id="photoInput" accept="image/*" />
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="fName" data-i18n="admin.fullName">Full name</label>
+              <input type="text" id="fName" name="name" required />
+            </div>
+            <div class="field">
+              <label for="fEmail" data-i18n="admin.email">Email</label>
+              <input type="email" id="fEmail" name="email" required />
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="fPassword" data-i18n="admin.password">Password</label>
+              <input type="password" id="fPassword" name="password" autocomplete="new-password" />
+              <div class="hint" id="passwordHint" style="text-align:left; margin-top:6px;">Minimum 8 characters.</div>
+            </div>
+            <div class="field">
+              <label for="fRole" data-i18n="admin.role">Role</label>
+              <select id="fRole" name="role">
+                <option value="user" data-i18n="common.roleStudent">Student</option>
+                <option value="instructor" data-i18n="common.roleInstructor">Instructor</option>
+                <option value="coordinator" data-i18n="common.roleCoordinator">Coordinator</option>
+                <option value="admin" data-i18n="admin.roleAdminOption">Admin</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field" id="studentIdField">
+            <label for="fStudentId" data-i18n="admin.studentId">Student ID</label>
+            <input type="text" id="fStudentId" name="student_id" placeholder="e.g. STD-1024" data-i18n-placeholder="admin.studentIdPlaceholder" />
+            <div class="hint" style="text-align:left; margin-top:6px;" data-i18n="admin.studentIdHint">A unique ID for this student. Letters, numbers, dashes and underscores only.</div>
+          </div>
+
+          <div class="field" id="studentCourseField">
+            <label for="fCourse" data-i18n="admin.enrolledCourse">Enrolled course</label>
+            <select id="fCourse" name="course_id">
+              <option value="" data-i18n="admin.noCourse">— No course —</option>
+            </select>
+            <div class="hint" style="text-align:left; margin-top:6px;" data-i18n="admin.enrolledCourseHint">Attendance, absence and completion are calculated from this course.</div>
+          </div>
+
+          <div class="field" id="staffCoursesField" style="display: none;">
+            <label id="staffCoursesLabel">Assigned courses</label>
+            <div class="check-list" id="fStaffCourses" role="group" aria-labelledby="staffCoursesLabel"></div>
+            <div class="hint" id="staffCoursesHint" style="text-align:left; margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="cancelBtn" data-i18n="common.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn" data-i18n="common.save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Account details modal -->
+  <div class="modal-backdrop" id="detailsModal">
+    <div class="modal modal-session">
+      <div class="modal-head">
+        <h3 data-i18n="admin.accountDetails">Account details</h3>
+        <button class="modal-close" id="closeDetailsModal" type="button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="details-user" id="detailsHeader"></div>
+        <div id="detailsBody"></div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-primary" id="detailsCloseBtn" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / edit course modal -->
+  <div class="modal-backdrop" id="courseModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="courseModalTitle">Add course</h3>
+        <button class="modal-close" id="closeCourseModal" type="button">&times;</button>
+      </div>
+
+      <form id="courseForm">
+        <div class="modal-body">
+          <div id="courseFormError" class="alert alert-error"></div>
+
+          <div class="field">
+            <label for="cName" data-i18n="admin.courseName">Course name</label>
+            <input type="text" id="cName" required placeholder="e.g. Full-Stack Web Development" data-i18n-placeholder="admin.courseNamePlaceholder" />
+          </div>
+
+          <div class="field">
+            <label for="cLocation" data-i18n="common.locationType">Location type</label>
+            <select id="cLocation" required>
+              <option value="" data-i18n="admin.chooseLocation">Choose…</option>
+              <option value="online" data-i18n="common.locationOnline">Online</option>
+              <option value="offline" data-i18n="common.locationOffline">Offline</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="cDescription"><span data-i18n="admin.description">Description</span> <span class="muted" data-i18n="admin.optional">(optional)</span></label>
+            <input type="text" id="cDescription" placeholder="Short description" data-i18n-placeholder="admin.descriptionPlaceholder" />
+          </div>
+
+          <div class="field">
+            <label data-i18n="admin.courseDays">Course days</label>
+            <div class="days-editor" id="daysEditor"></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="addDayBtn" data-i18n="admin.addDay">+ Add day</button>
+            <div class="hint" style="text-align:left; margin-top:8px;" data-i18n="admin.courseDaysHint">Add the date of every course day. Attendance is taken per day.</div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="cancelCourseBtn" data-i18n="common.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveCourseBtn" data-i18n="common.save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add / edit certificate modal -->
+  <div class="modal-backdrop" id="certificateModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="certificateModalTitle">Add certificate</h3>
+        <button class="modal-close" id="closeCertificateModal" type="button">&times;</button>
+      </div>
+
+      <form id="certificateForm">
+        <div class="modal-body">
+          <div id="certificateFormError" class="alert alert-error"></div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="certStudent" data-i18n="admin.certStudent">Student</label>
+              <select id="certStudent" required></select>
+            </div>
+            <div class="field">
+              <label for="certCourse" data-i18n="admin.certCourse">Course</label>
+              <select id="certCourse">
+                <option value="" data-i18n="admin.noCourseOption">— No specific course —</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="certTitle" data-i18n="admin.certTitle">Certificate title</label>
+            <input type="text" id="certTitle" required placeholder="e.g. Certificate of Completion" data-i18n-placeholder="admin.certTitlePlaceholder" />
+          </div>
+
+          <div class="field">
+            <label for="certBody"><span data-i18n="admin.certBody">Additional text</span> <span class="muted" data-i18n="admin.optional">(optional)</span></label>
+            <textarea id="certBody" rows="3" placeholder="Short note shown on the certificate" data-i18n-placeholder="admin.certBodyPlaceholder"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="certDate" data-i18n="admin.certIssued">Issue date</label>
+            <input type="date" id="certDate" required />
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="cancelCertificateBtn" data-i18n="common.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveCertificateBtn" data-i18n="common.save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Profile photo crop modal -->
+  <div class="modal-backdrop crop-backdrop" id="cropModal">
+    <div class="modal modal-crop">
+      <div class="modal-head">
+        <h3 data-i18n="common.adjustPhoto">Adjust photo</h3>
+        <button class="modal-close" id="closeCropModal" type="button">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="crop-stage" id="cropStage">
+          <img id="cropImage" alt="" draggable="false" />
+          <div class="crop-ring"></div>
+        </div>
+
+        <div class="crop-controls">
+          <span class="crop-zoom-icon">−</span>
+          <input type="range" id="cropZoom" min="1" max="3" step="0.01" value="1" />
+          <span class="crop-zoom-icon">+</span>
+        </div>
+
+        <p class="crop-hint" data-i18n="common.cropHint">Drag the photo to reposition it, and use the slider to zoom.</p>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="cancelCropBtn" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="applyCropBtn" data-i18n="common.apply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/live-log.js"></script>
+</body>
+</html>

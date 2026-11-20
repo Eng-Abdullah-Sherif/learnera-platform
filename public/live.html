@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live session · LearnEra</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body class="live-body">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" id="topRole">…</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="live-page" id="livePage">
+    <div class="live-head">
+      <div class="live-head-main">
+        <a class="back-link" id="backLink" href="/dashboard" data-i18n="live.back">&larr; Back</a>
+        <h1 id="liveTitle">…</h1>
+        <p class="live-sub">
+          <span id="liveCourse">…</span>
+          <span class="live-dot" aria-hidden="true"></span>
+          <span id="liveHost">…</span>
+          <span class="live-badge" id="liveStatus" data-i18n="live.liveBadge">LIVE</span>
+        </p>
+      </div>
+      <div class="live-head-actions">
+        <span class="live-role-chip" id="myRoleChip">…</span>
+      </div>
+    </div>
+
+    <div class="live-layout">
+      <section class="live-stage" id="liveStage">
+        <video id="stageVideo" autoplay playsinline></video>
+        <div class="live-stage-empty" id="stageEmpty">
+          <div class="live-stage-empty-icon" aria-hidden="true">🎥</div>
+          <h2 data-i18n="live.stageWaiting">Waiting for the presenter…</h2>
+          <p data-i18n="live.stageWaitingSub">The shared screen will appear here.</p>
+        </div>
+        <div class="live-stage-label" id="stageLabel" style="display:none;"></div>
+      </section>
+
+      <aside class="live-side">
+        <div class="live-side-head">
+          <h2 data-i18n="live.participants">Participants</h2>
+          <span class="live-count" id="participantCount">0</span>
+        </div>
+        <div class="live-participants" id="participantList"></div>
+      </aside>
+    </div>
+
+    <footer class="live-controls">
+      <div class="live-controls-left">
+        <button class="btn btn-ghost btn-sm" id="micBtn" type="button">
+          <span class="ctrl-icon" id="micIcon">🎙️</span>
+          <span id="micLabel" data-i18n="live.micOn">Microphone</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="handBtn" type="button" style="display:none;">
+          <span class="ctrl-icon">✋</span>
+          <span id="handLabel" data-i18n="live.raiseHand">Raise hand</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="screenBtn" type="button" style="display:none;">
+          <span class="ctrl-icon">🖥️</span>
+          <span id="screenLabel" data-i18n="live.shareScreen">Share screen</span>
+        </button>
+      </div>
+      <div class="live-controls-right">
+        <span class="live-hint" id="micHint"></span>
+        <button class="btn btn-ghost btn-sm" id="fullBtn" type="button">
+          <span class="ctrl-icon" id="fullIcon">⛶</span>
+          <span id="fullLabel" data-i18n="live.fullscreen">Full screen</span>
+        </button>
+        <button class="btn btn-danger btn-sm" id="endBtn" type="button" style="display:none;" data-i18n="live.endSession">End session</button>
+        <button class="btn btn-ghost btn-sm" id="leaveBtn" type="button" data-i18n="live.leave">Leave</button>
+      </div>
+    </footer>
+  </main>
+
+  <div class="live-overlay" id="liveOverlay" style="display:none;">
+    <div class="live-overlay-card">
+      <h2 id="overlayTitle" data-i18n="live.endedTitle">Session ended</h2>
+      <p id="overlayText" data-i18n="live.endedText">The host has ended this live session.</p>
+      <a class="btn btn-primary" id="overlayBack" href="/dashboard" data-i18n="live.backToDashboard">Back to dashboard</a>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/live.js"></script>
+</body>
+</html>

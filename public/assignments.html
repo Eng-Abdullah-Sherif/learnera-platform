@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-default-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تماريني · LearnEra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body class="student-body">
+  <div class="page-bg" id="pageBg" aria-hidden="true">
+    <div class="bg-orbs" id="pageOrbs">
+      <span class="orb o1"></span>
+      <span class="orb o2"></span>
+      <span class="orb o3"></span>
+      <span class="orb o4"></span>
+      <span class="orb o5"></span>
+    </div>
+    <div class="bg-stars" id="pageStars"></div>
+  </div>
+
+  <header class="topbar student-topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="student-brand-copy">
+        <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+        <small data-i18n="dashboard.brandTag">منصة التعلم والتدريب الاحترافي</small>
+      </div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" id="topRole" data-i18n="common.roleStudent">طالب</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <main class="student-page">
+    <a class="back-link" href="/dashboard" data-i18n="assignments.backToDashboard">&larr; الرجوع إلى لوحة التحكم</a>
+
+    <div class="assignments-panel">
+      <div class="student-section-head">
+        <div>
+          <h2 class="student-section-title"><span class="section-mark exercise-mark"></span><span data-i18n="assignments.title">تماريني</span></h2>
+          <p data-i18n="assignments.subtitle">كل الواجبات المنزلية المنشورة لدورتك.</p>
+        </div>
+      </div>
+
+      <section class="assignments-list" id="assignmentsGrid"></section>
+
+      <div class="exercise-empty" id="emptyState" style="display: none;">
+        <span class="empty-illustration" aria-hidden="true">✦</span>
+        <p data-i18n="assignments.empty">لا توجد تمارين بعد. تحقق مرة أخرى بعد جلستك القادمة.</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/assignments.js"></script>
+</body>
+</html>

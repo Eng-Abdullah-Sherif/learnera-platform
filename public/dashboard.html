@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-default-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لوحة الطالب · LearnEra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body class="student-body">
+  <div class="page-bg" id="pageBg" aria-hidden="true">
+    <div class="bg-orbs" id="pageOrbs">
+      <span class="orb o1"></span>
+      <span class="orb o2"></span>
+      <span class="orb o3"></span>
+      <span class="orb o4"></span>
+      <span class="orb o5"></span>
+    </div>
+    <div class="bg-stars" id="pageStars"></div>
+  </div>
+
+  <header class="topbar student-topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="student-brand-copy">
+        <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+        <small data-i18n="dashboard.brandTag">منصة التعلم والتدريب الاحترافي</small>
+      </div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" id="topRole" data-i18n="common.roleStudent">طالب</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <main class="student-page">
+      <div class="live-banner" id="liveBanner" style="display: none;"></div>
+
+      <section class="student-hero" data-i18n-aria="dashboard.studentProfile" aria-label="Student profile">
+        <div class="student-identity">
+          <div class="student-photo-frame">
+            <div id="avatarSlot" class="student-photo"></div>
+            <span class="student-active" data-i18n="dashboard.active">نشط</span>
+          </div>
+          <div class="student-details">
+            <div class="student-name-row">
+              <span class="student-type" data-i18n="dashboard.regularStudent">طالب منتظم</span>
+              <h1 id="userName">…</h1>
+            </div>
+            <p class="student-email"><span id="userEmail">…</span><span class="student-mail-icon" aria-hidden="true">✉</span></p>
+            <div class="student-account-meta">
+              <span class="verified-line"><span aria-hidden="true">✓</span><span data-i18n="dashboard.registeredAccount">حساب مسجل في LearnEra</span></span>
+              <span class="meta-divider" aria-hidden="true">·</span>
+              <span><span data-i18n="dashboard.joined">تاريخ الانضمام</span> <b id="joinDate">—</b></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-course-card">
+          <span class="hero-course-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.66 3.13 3 7 3s7-1.34 7-3V5M5 10v5c0 1.66 3.13 3 7 3s7-1.34 7-3v-5M5 15v4c0 1.66 3.13 3 7 3s7-1.34 7-3v-4"/></svg>
+          </span>
+          <div class="hero-course-copy">
+            <span class="hero-course-label" data-i18n="dashboard.enrolledCourse">الدورة المسجلة</span>
+            <div class="hero-course-name" id="courseName" data-i18n="dashboard.noCourse">لا توجد دورة مسجلة</div>
+            <div class="hero-course-progress"><span data-i18n="dashboard.progress">تقدم الدورة</span><b id="sessionProgress">0%</b></div>
+          </div>
+          <span class="track-badge" id="courseTrack" data-i18n="dashboard.courseTrack">مسار الدورة</span>
+        </div>
+      </section>
+
+      <section class="student-stats" data-i18n-aria="dashboard.attendanceStats" aria-label="Attendance statistics">
+        <article class="student-overview">
+          <div class="overview-metric overview-completion">
+            <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m3 16 6-6 4 4 8-9M15 5h6v6"/></svg></span>
+            <div class="overview-copy">
+              <h2 data-i18n="dashboard.completion">إكمال الدورة</h2>
+              <div class="stat-value"><span id="completionValue">0%</span></div>
+              <div class="completion-track"><span id="completionBar"></span></div>
+            </div>
+          </div>
+
+          <div class="overview-metric overview-attendance">
+            <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="10" cy="8" r="4"/><path d="M3 20c0-3.3 3.1-6 7-6 1.8 0 3.5.6 4.8 1.5M16 18l2 2 4-5"/></svg></span>
+            <div class="overview-copy">
+              <h2 data-i18n="dashboard.attendanceDays">أيام الحضور</h2>
+              <div class="stat-value"><span id="attendanceValue">0</span><small data-i18n="dashboard.daysPresent">أيام حضور</small></div>
+            </div>
+          </div>
+
+          <div class="overview-metric overview-absence">
+            <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="10" cy="8" r="4"/><path d="M3 20c0-3.3 3.1-6 7-6 1.2 0 2.3.25 3.3.7M18 8v6m-3-3h6"/></svg></span>
+            <div class="overview-copy">
+              <h2 data-i18n="dashboard.absenceDays">أيام الغياب</h2>
+              <div class="stat-value"><span id="absenceValue">0</span><small data-i18n="dashboard.daysAbsent">أيام غياب</small></div>
+            </div>
+          </div>
+
+          <button class="overview-action" id="reviewAttendance" type="button" data-i18n="dashboard.reviewRecord">مراجعة السجل ←</button>
+        </article>
+      </section>
+
+      <section class="student-content-grid">
+        <div class="exercises-column">
+          <div class="exercises-panel">
+            <div class="student-section-head">
+              <div>
+                <h2 class="student-section-title"><span class="section-mark exercise-mark"></span><span data-i18n="dashboard.assignmentsTitle">تماريني</span></h2>
+                <p data-i18n="dashboard.assignmentsSubtitle">التمارين القادمة والمتأخرة والمكتملة لدورتك.</p>
+              </div>
+              <a class="open-all-link" href="/assignments"><span data-i18n="dashboard.openAll">فتح الكل</span><span aria-hidden="true">↖</span></a>
+            </div>
+
+            <div class="exercise-tabs" role="tablist" data-i18n-aria="dashboard.exerciseTabs" aria-label="Exercise status">
+              <button class="exercise-tab active" type="button" data-filter="upcoming" role="tab" aria-selected="true"><span data-i18n="dashboard.upcoming">القادمة</span> <b id="upcomingCount">0</b></button>
+              <button class="exercise-tab" type="button" data-filter="overdue" role="tab" aria-selected="false"><span data-i18n="dashboard.overdue">المتأخرة</span> <b id="overdueCount">0</b></button>
+              <button class="exercise-tab" type="button" data-filter="completed" role="tab" aria-selected="false"><span data-i18n="dashboard.completed">المكتملة</span> <b id="completedCount">0</b></button>
+            </div>
+            <section id="assignmentGroups"></section>
+            <div class="exercise-empty" id="assignmentsEmpty" style="display:none;">
+              <span class="empty-illustration" aria-hidden="true">✦</span>
+              <p data-i18n="dashboard.assignmentsEmpty">لا توجد تمارين في هذا القسم.</p>
+            </div>
+          </div>
+        </div>
+
+        <aside class="materials-column">
+          <div class="materials-panel">
+            <div class="student-section-head">
+              <div>
+                <h2 class="student-section-title"><span class="section-mark materials-mark"></span><span data-i18n="dashboard.materialsTitle">مواد الدورة</span></h2>
+                <p data-i18n="dashboard.materialsSubtitle">الملفات التي شاركها الكوردنيتور.</p>
+              </div>
+              <span class="materials-count" id="materialsCount">0 <span data-i18n="dashboard.files">ملفات</span></span>
+            </div>
+            <section class="materials-list" id="materialsList"></section>
+            <div class="materials-empty" id="materialsEmpty" style="display:none;">
+              <div class="materials-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none"><path d="M7 14a4 4 0 0 1 4-4h10l5 5h11a4 4 0 0 1 4 4v17a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4V14Z"/><path d="M7 20h34"/></svg>
+                <span id="materialsEmptyCount">0</span>
+              </div>
+              <h3 data-i18n="dashboard.materialsEmptyTitle">لم تتم مشاركة أي مواد بعد</h3>
+              <p data-i18n="dashboard.materialsEmptyBody">ستظهر هنا الملفات التي يشاركها منسق الدورة.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+  </main>
+
+  <div class="modal-backdrop" id="attendanceModal">
+    <div class="modal attendance-modal">
+      <div class="modal-head">
+        <h3 data-i18n="dashboard.attendanceRecord">سجل الحضور</h3>
+        <button class="modal-close" id="attendanceClose" type="button" data-i18n-aria="common.close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" id="attendanceRecordBody"></div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

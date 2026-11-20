@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Submissions · LearnEra</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" data-i18n="common.roleAdmin">Administrator</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page page-wide">
+    <a class="back-link" href="/admin/assignments" data-i18n="assignmentAdmin.backToAssignments">&larr; Back to assignments</a>
+
+    <div class="page-head">
+      <div>
+        <h1 id="assignmentTitle">…</h1>
+        <p id="assignmentMeta">…</p>
+      </div>
+    </div>
+
+    <section class="card assignment-brief">
+      <p id="assignmentDescription" class="assignment-desc"></p>
+      <div class="file-list" id="assignmentFiles"></div>
+    </section>
+
+    <section class="course-summary" id="summary" style="margin-top: 22px;"></section>
+
+    <div class="page-head" style="margin-top: 28px;">
+      <div>
+        <h2 class="section-title" data-i18n="assignmentAdmin.submissionsTitle">Submissions</h2>
+        <p data-i18n="assignmentAdmin.submissionsSubtitle">Every solution uploaded by the students of this course.</p>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="assignmentAdmin.thStudent">Student</th>
+              <th data-i18n="assignmentAdmin.thSubmitted">Submitted</th>
+              <th data-i18n="assignmentAdmin.thFiles">Files</th>
+              <th data-i18n="assignmentAdmin.thGrade">Grade</th>
+              <th data-i18n="assignmentAdmin.thActions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="submissionsBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyState" style="display: none;" data-i18n="assignmentAdmin.empty">No submissions yet.</div>
+    </section>
+  </main>
+
+  <!-- Grading modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 data-i18n="assignmentAdmin.gradeTitle">Grade submission</h3>
+        <button class="modal-close" id="closeModal" type="button">&times;</button>
+      </div>
+
+      <form id="gradeForm">
+        <div class="modal-body">
+          <div id="formError" class="alert alert-error"></div>
+          <p class="grade-student" id="gradeStudent"></p>
+          <div class="file-list" id="gradeFiles"></div>
+
+          <div class="field">
+            <label for="fGrade"><span data-i18n="assignmentAdmin.grade">Grade</span> <span class="muted" id="gradeMax"></span></label>
+            <input type="number" id="fGrade" min="0" step="0.5" required />
+          </div>
+
+          <div class="field">
+            <label for="fFeedback"><span data-i18n="assignmentAdmin.feedback">Feedback</span> <span class="muted" data-i18n="assignmentAdmin.optional">(optional)</span></label>
+            <textarea id="fFeedback" rows="4" data-i18n-placeholder="assignmentAdmin.feedbackPlaceholder" placeholder="Notes for the student"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="cancelBtn" data-i18n="common.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn" data-i18n="assignmentAdmin.saveGrade">Save grade</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/assignment-admin.js"></script>
+</body>
+</html>

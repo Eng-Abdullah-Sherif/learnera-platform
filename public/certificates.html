@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-default-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>شهاداتي · LearnEra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body class="student-body">
+  <div class="page-bg" id="pageBg" aria-hidden="true">
+    <div class="bg-orbs" id="pageOrbs">
+      <span class="orb o1"></span>
+      <span class="orb o2"></span>
+      <span class="orb o3"></span>
+      <span class="orb o4"></span>
+      <span class="orb o5"></span>
+    </div>
+    <div class="bg-stars" id="pageStars"></div>
+  </div>
+
+  <header class="topbar student-topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="student-brand-copy">
+        <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+        <small data-i18n="dashboard.brandTag">منصة التعلم والتدريب الاحترافي</small>
+      </div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" id="topRole" data-i18n="common.roleStudent">طالب</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <main class="student-page">
+    <a class="back-link" href="/dashboard" data-i18n="certificates.backToDashboard">&larr; الرجوع إلى لوحة التحكم</a>
+
+    <section class="student-hero" data-i18n-aria="dashboard.studentProfile" aria-label="Student profile">
+      <div class="student-identity">
+        <div class="student-photo-frame">
+          <div id="avatarSlot" class="student-photo"></div>
+          <span class="student-active" data-i18n="dashboard.active">نشط</span>
+        </div>
+        <div class="student-details">
+          <div class="student-name-row">
+            <span class="student-type" data-i18n="dashboard.regularStudent">طالب منتظم</span>
+            <h1 id="userName">…</h1>
+          </div>
+          <p class="student-email"><span id="userEmail">…</span><span class="student-mail-icon" aria-hidden="true">✉</span></p>
+          <div class="student-account-meta">
+            <span class="verified-line"><span aria-hidden="true">✓</span><span data-i18n="dashboard.registeredAccount">حساب مسجل في LearnEra</span></span>
+            <span class="meta-divider" aria-hidden="true">·</span>
+            <span><span data-i18n="dashboard.joined">تاريخ الانضمام</span> <b id="joinDate">—</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-course-card">
+        <span class="hero-course-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.66 3.13 3 7 3s7-1.34 7-3V5M5 10v5c0 1.66 3.13 3 7 3s7-1.34 7-3v-5M5 15v4c0 1.66 3.13 3 7 3s7-1.34 7-3v-4"/></svg>
+        </span>
+        <div class="hero-course-copy">
+          <span class="hero-course-label" data-i18n="dashboard.enrolledCourse">الدورة المسجلة</span>
+          <div class="hero-course-name" id="courseName" data-i18n="dashboard.noCourse">لا توجد دورة مسجلة</div>
+          <div class="hero-course-progress"><span data-i18n="dashboard.progress">تقدم الدورة</span><b id="sessionProgress">0%</b></div>
+        </div>
+        <span class="track-badge" id="courseTrack" data-i18n="dashboard.courseTrack">مسار الدورة</span>
+      </div>
+    </section>
+
+    <div class="certificates-panel">
+      <div class="student-section-head">
+        <div>
+          <h2 class="student-section-title"><span class="section-mark certificate-mark"></span><span data-i18n="certificates.title">شهاداتي</span></h2>
+          <p data-i18n="certificates.subtitle">شهادات إتمام دوراتك، جاهزة للعرض والطباعة.</p>
+        </div>
+      </div>
+
+      <section class="certificates-list" id="certificatesList"></section>
+
+      <div class="exercise-empty" id="emptyState" style="display: none;">
+        <span class="empty-illustration" aria-hidden="true">✦</span>
+        <p data-i18n="certificates.empty">لا توجد شهادات بعد. تُصدر الشهادات من إدارة المنصة عند إتمام الدورة.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Print-only certificate sheet (hidden on screen, shown when printing). -->
+  <div class="certificate-print" id="certificatePrint" aria-hidden="true"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/certificates.js"></script>
+</body>
+</html>

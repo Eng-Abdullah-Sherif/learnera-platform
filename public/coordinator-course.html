@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Course · LearnEra</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" id="topRole" data-i18n="common.roleCoordinator">Coordinator</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page page-wide">
+    <a class="back-link" href="/coordinator" data-i18n="coordinatorCourse.backToCourses">&larr; Back to my courses</a>
+
+    <div class="page-head">
+      <div>
+        <h1 id="courseName">…</h1>
+        <p id="courseDescription">…</p>
+      </div>
+      <div class="course-head-actions">
+        <span class="stat-chip" data-i18n="coordinatorCourse.readOnly">Course details are read-only</span>
+        <button class="btn btn-primary btn-sm" id="liveBtn" type="button" data-i18n="coordinatorCourse.startLive">Start live session</button>
+      </div>
+    </div>
+
+    <section class="course-summary" id="courseSummary"></section>
+
+    <div class="page-head" style="margin-top: 34px;">
+      <div>
+        <h2 class="section-title" data-i18n="coordinatorCourse.announcementsTitle">Announcements</h2>
+        <p data-i18n="coordinatorCourse.announcementsSubtitle">Post updates for the students of this course.</p>
+      </div>
+      <button class="btn btn-primary btn-sm" id="newAnnouncementBtn" type="button" data-i18n="coordinatorCourse.newAnnouncement">+ New announcement</button>
+    </div>
+    <section class="announcement-list" id="announcementList"></section>
+    <div class="card empty" id="announcementsEmpty" style="display: none;" data-i18n="common.noAnnouncements">No announcements yet.</div>
+
+    <div class="page-head" style="margin-top: 34px;">
+      <div>
+        <h2 class="section-title" data-i18n="coordinatorCourse.filesTitle">Course files</h2>
+        <p data-i18n="coordinatorCourse.filesSubtitle">Share PDFs, images and documents with the students of this course.</p>
+      </div>
+    </div>
+    <section class="card course-files-card">
+      <form id="courseFileForm" class="course-file-form">
+        <div class="field">
+          <label for="courseFilesInput" data-i18n="coordinatorCourse.chooseFiles">Choose files to share (PDF, images or documents · up to 15 MB each)</label>
+          <input type="file" id="courseFilesInput" name="files" multiple />
+        </div>
+        <button class="btn btn-primary btn-sm" id="courseFileUploadBtn" type="submit" data-i18n="coordinatorCourse.uploadFiles">Upload files</button>
+      </form>
+      <div class="file-list course-file-list" id="courseFileList"></div>
+      <div class="empty" id="courseFilesEmpty" style="display: none;" data-i18n="coordinatorCourse.filesEmpty">No files have been shared yet.</div>
+    </section>
+
+    <div class="page-head" style="margin-top: 34px;">
+      <div>
+        <h2 class="section-title" data-i18n="coordinatorCourse.studentsTitle">Students &amp; attendance</h2>
+        <p data-i18n="coordinatorCourse.studentsSubtitle">Tick a box when the student attends. Unticked means absent.</p>
+      </div>
+    </div>
+    <section class="card">
+      <div class="table-wrap">
+        <table class="attendance-grid" id="attendanceTable">
+          <thead id="gridHead"></thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="studentsEmpty" style="display: none;" data-i18n="coordinatorCourse.studentsEmpty">
+        No students are enrolled in this course yet.
+      </div>
+    </section>
+  </main>
+
+  <!-- Announcement create / edit modal -->
+  <div class="modal-backdrop" id="announcementModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="announcementModalTitle">New announcement</h3>
+        <button class="modal-close" id="announcementClose" type="button">&times;</button>
+      </div>
+      <form id="announcementForm">
+        <div class="modal-body">
+          <div class="field">
+            <label for="annTitle" data-i18n="coordinatorCourse.titleField">Title</label>
+            <input type="text" id="annTitle" maxlength="200" placeholder="Announcement title" data-i18n-placeholder="coordinatorCourse.titlePlaceholder" required />
+          </div>
+          <div class="field">
+            <label for="annBody" data-i18n="coordinatorCourse.messageField">Message</label>
+            <textarea id="annBody" rows="4" placeholder="Write the announcement…" data-i18n-placeholder="coordinatorCourse.messagePlaceholder"></textarea>
+          </div>
+          <div class="field">
+            <label for="annPublish" data-i18n="coordinatorCourse.dateField">Date</label>
+            <input type="date" id="annPublish" />
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="announcementCancel" type="button" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn-primary" id="announcementSave" type="submit">Publish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/coordinator-course.js"></script>
+</body>
+</html>

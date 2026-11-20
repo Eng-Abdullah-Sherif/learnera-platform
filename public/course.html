@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Course · LearnEra</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/theme.js"></script>
+  <script src="/js/i18n.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="/uploads/Logo.jpeg" alt="LearnEra" /></div>
+      <div class="brand-name"><span class="bn-l">L</span><span class="bn-mid">earn</span><span class="bn-era">Era</span></div>
+    </div>
+    <div class="topbar-user">
+      <div id="topAvatar"></div>
+      <div class="who">
+        <div class="name" id="topName">…</div>
+        <div class="role" data-i18n="common.roleAdmin">Administrator</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page page-wide">
+    <a class="back-link" href="/admin"><span aria-hidden="true">&larr;</span> <span data-i18n="course.backToAdmin">Back to admin</span></a>
+
+    <div class="page-head">
+      <div>
+        <h1 id="courseName">…</h1>
+        <p id="courseDescription">…</p>
+      </div>
+      <span id="courseLocation"></span>
+    </div>
+
+    <section class="course-summary" id="courseSummary"></section>
+
+    <div class="page-head" style="margin-top: 34px;">
+      <div>
+        <h2 class="section-title" data-i18n="course.studentsAttendance">Students &amp; attendance</h2>
+        <p data-i18n="course.attendanceHint">Tick a box when the student attends. Unticked means absent.</p>
+      </div>
+    </div>
+    <section class="card">
+      <div class="table-wrap">
+        <table class="attendance-grid" id="attendanceTable">
+          <thead id="gridHead"></thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="studentsEmpty" style="display: none;" data-i18n="course.studentsEmpty">
+        No students are enrolled in this course. Enrol them from the Accounts section.
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/course.js"></script>
+</body>
+</html>
