@@ -67,10 +67,11 @@ function homePath(role) {
   return '/dashboard';
 }
 
+// Landing page for guests; signed-in users go straight to their home.
 app.get('/', (req, res) => {
   const user = currentUser(req);
-  if (!user) return res.redirect('/login');
-  res.redirect(homePath(user.role));
+  if (user) return res.redirect(homePath(user.role));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 app.get('/login', (req, res) => {
