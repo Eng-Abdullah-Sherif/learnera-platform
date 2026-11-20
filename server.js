@@ -40,6 +40,9 @@ app.use(sessionMiddleware);
 
 // Static assets (css, js, uploaded photos).
 app.use(express.static(PUBLIC_DIR));
+// The root landing page (index.html) references its assets relative to the
+// project root (e.g. "public/css/styles.css"), so expose the folder at /public.
+app.use('/public', express.static(PUBLIC_DIR));
 
 // API routes.
 app.use('/api/auth', authRoutes);
@@ -67,11 +70,10 @@ function homePath(role) {
   return '/dashboard';
 }
 
-// Landing page for guests; signed-in users go straight to their home.
-// The welcome page lives at the project root (index.html).
-app.get('/', (req, res) => {
-  const user = currentUser(req);
-  if (user) return res.redirect(homePath(user.role));
+// The site always starts on the welcome landing page (index.html at the
+// project root). Signed-in users reach their dashboard through the "Sign in"
+// button, which goes to /login and is then redirected to their home.
+app.get(['/', '/index.html'], (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
