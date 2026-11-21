@@ -9,8 +9,9 @@
  * only manage the session lifecycle and its notifications.
  */
 const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
-  db,
+  findCourseInfo,
   staffTeachesCourse,
   listStaffCourseIds,
   findLiveSession,
@@ -23,11 +24,11 @@ const {
   listLiveParticipants,
   listLiveEvents,
   logActivity,
-} = require('../db');
+} = require('../data');
 const { requireAuth } = require('../auth');
 const { notifySessionStarted, notifySessionEnded, closeSessionRoom } = require('../live');
 
-const router = express.Router();
+const router = createAsyncRouter();
 router.use(requireAuth);
 
 /** Parses an id from a request value. */
@@ -42,16 +43,16 @@ function canHost(user) {
 }
 
 /** Admins reach every course; staff only the ones assigned to them. */
-function canManageCourse(user, courseId) {
-  return user.role === 'admin' || staffTeachesCourse(user.id, courseId);
+async function canManageCourse(user, courseId) {
+  return user.role === 'admin' || await staffTeachesCourse(user.id, courseId);
 }
 
 /** Who is this user inside a given session, and what may they do. */
-function accessFor(user, session) {
+async function accessFor(user, session) {
   const isAdmin = user.role === 'admin';
   const isHost = session.host_id === user.id;
   const isStaff = user.role === 'instructor' || user.role === 'coordinator';
-  const assigned = isStaff && staffTeachesCourse(user.id, session.course_id);
+  const assigned = isStaff && await staffTeachesCourse(user.id, session.course_id);
   const enrolled = user.role === 'user' && user.course_id === session.course_id;
 
   if (!isAdmin && !isHost && !assigned && !enrolled) return null;
@@ -84,7 +85,9 @@ function shape(row) {
 /** Parses a SQLite UTC datetime ("YYYY-MM-DD HH:MM:SS") into a Date. */
 function toDate(value) {
   if (!value) return null;
-  const d = new Date(`${String(value).replace(' ', 'T')}Z`);
+  const text = String(value);
+  const normalized = text.includes('T') ? text : `${text.replace(' ', 'T')}Z`;
+  const d = new Date(normalized);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -141,10 +144,10 @@ function participantShape(row, sessionSecs) {
 }
 
 /** True when the user may read the log of a session. */
-function canViewLog(user, session) {
+async function canViewLog(user, session) {
   if (user.role === 'admin') return true;
   if (session.host_id === user.id) return true;
-  return (user.role === 'instructor' || user.role === 'coordinator') && staffTeachesCourse(user.id, session.course_id);
+  return (user.role === 'instructor' || user.role === 'coordinator') && await staffTeachesCourse(user.id, session.course_id);
 }
 
 /** True when the user may browse the sessions log at all (staff only). */
@@ -153,8 +156,8 @@ function canViewLogs(user) {
 }
 
 /** GET /api/live/active - the live sessions relevant to the signed-in user. */
-router.get('/active', (req, res) => {
-  res.json({ sessions: listLiveSessionsForUser(req.user).map(shape) });
+router.get('/active', async (req, res) => {
+  res.json({ sessions: (await listLiveSessionsForUser(req.user)).map(shape) });
 });
 
 /** Trims a query value to a string, or returns null when it is empty. */
@@ -179,7 +182,7 @@ function queryDate(value, end) {
  *   `course_id`, `status` (live|ended), `from`/`to` (date range, inclusive),
  *   `q` (search across title, course, host and participants) and `limit`.
  */
-router.get('/log', (req, res) => {
+router.get('/log', async (req, res) => {
   if (!canViewLogs(req.user)) return res.status(403).json({ error: 'Not allowed' });
 
   const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 50, 1), 200);
@@ -191,63 +194,64 @@ router.get('/log', (req, res) => {
 
   const filters = { courseId, status, q, from, to, limit };
   if (req.user.role === 'admin') {
-    return res.json({ sessions: listLiveSessionLogs(filters).map(logShape) });
+    return res.json({ sessions: (await listLiveSessionLogs(filters)).map(logShape) });
   }
-  const courseIds = listStaffCourseIds(req.user.id);
-  res.json({ sessions: listLiveSessionLogs({ ...filters, courseIds }).map(logShape) });
+  const courseIds = await listStaffCourseIds(req.user.id);
+  res.json({ sessions: (await listLiveSessionLogs({ ...filters, courseIds })).map(logShape) });
 });
 
 /** GET /api/live/:id/log - one session with its participants and event timeline. */
-router.get('/:id/log', (req, res) => {
+router.get('/:id/log', async (req, res) => {
   const id = toId(req.params.id);
-  const session = findLiveSessionLog(id);
+  const session = await findLiveSessionLog(id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
-  if (!canViewLog(req.user, session)) return res.status(403).json({ error: 'Not allowed' });
+  if (!(await canViewLog(req.user, session))) return res.status(403).json({ error: 'Not allowed' });
 
   const log = logShape(session);
+  const [participants, events] = await Promise.all([listLiveParticipants(id), listLiveEvents(id)]);
   res.json({
     session: log,
-    participants: listLiveParticipants(id).map((p) => participantShape(p, log.duration_secs)),
-    events: listLiveEvents(id),
+    participants: participants.map((p) => participantShape(p, log.duration_secs)),
+    events,
   });
 });
 
 /** GET /api/live/:id - one session plus the caller's role inside it. */
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const id = toId(req.params.id);
-  const session = findLiveSession(id);
+  const session = await findLiveSession(id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
-  const access = accessFor(req.user, session);
+  const access = await accessFor(req.user, session);
   if (!access) return res.status(403).json({ error: 'You cannot access this session' });
 
   res.json({ session: shape(session), ...access });
 });
 
 /** GET /api/live/courses/:id/current - the live session of a course (managers). */
-router.get('/courses/:id/current', (req, res) => {
+router.get('/courses/:id/current', async (req, res) => {
   const courseId = toId(req.params.id);
-  if (!canManageCourse(req.user, courseId)) {
+  if (!(await canManageCourse(req.user, courseId))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
-  const session = findActiveSessionForCourse(courseId);
+  const session = await findActiveSessionForCourse(courseId);
   res.json({ session: session ? shape(session) : null });
 });
 
 /** POST /api/live/courses/:id/start - open a live session for a course. */
-router.post('/courses/:id/start', (req, res) => {
+router.post('/courses/:id/start', async (req, res) => {
   const courseId = toId(req.params.id);
   if (!canHost(req.user)) return res.status(403).json({ error: 'Not allowed' });
-  if (!canManageCourse(req.user, courseId)) {
+  if (!(await canManageCourse(req.user, courseId))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
-  const course = db.prepare(`SELECT id, name FROM courses WHERE id = ?`).get(courseId);
+  const course = await findCourseInfo(courseId);
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
   const title = String((req.body && req.body.title) || '').trim().slice(0, 200);
-  const session = createLiveSession({ courseId, hostId: req.user.id, title });
+  const session = await createLiveSession({ courseId, hostId: req.user.id, title });
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'live.start',
     entity: 'course',
@@ -256,22 +260,22 @@ router.post('/courses/:id/start', (req, res) => {
     ip: req.ip,
   });
 
-  notifySessionStarted(session);
+  await notifySessionStarted(session);
   res.status(201).json({ session: shape(session) });
 });
 
 /** POST /api/live/:id/end - close a live session. */
-router.post('/:id/end', (req, res) => {
+router.post('/:id/end', async (req, res) => {
   const id = toId(req.params.id);
-  const session = findLiveSession(id);
+  const session = await findLiveSession(id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
-  const access = accessFor(req.user, session);
+  const access = await accessFor(req.user, session);
   if (!access || !access.canControl) return res.status(403).json({ error: 'Not allowed' });
 
-  const ended = endLiveSession(id);
+  const ended = await endLiveSession(id);
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'live.end',
     entity: 'course',
@@ -281,8 +285,10 @@ router.post('/:id/end', (req, res) => {
   });
 
   closeSessionRoom(id);
-  if (ended) notifySessionEnded(ended);
+  if (ended) await notifySessionEnded(ended);
   res.json({ ok: true, session: ended ? shape(ended) : null });
 });
 
 module.exports = router;
+module.exports.durationSeconds = durationSeconds;
+module.exports.participantShape = participantShape;

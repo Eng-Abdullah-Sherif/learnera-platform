@@ -1,6 +1,6 @@
 /**
  * LearnEra website - Express server.
- * Session-based authentication backed by SQLite (passwords hashed with bcrypt).
+ * Session-based authentication backed by Supabase Postgres (bcrypt passwords).
  */
 require('dotenv').config();
 
@@ -9,7 +9,7 @@ const http = require('http');
 const express = require('express');
 const multer = require('multer');
 
-const { initDatabase, findUserById } = require('./src/db');
+const { initDatabase, findUserById } = require('./src/data');
 const { sessionMiddleware } = require('./src/session');
 const { attachLiveServer } = require('./src/live');
 const authRoutes = require('./src/routes/auth');
@@ -23,8 +23,6 @@ const certificateAdminRoutes = require('./src/routes/certificates-admin');
 const announcementRoutes = require('./src/routes/announcements');
 const courseFileRoutes = require('./src/routes/course-files');
 const liveRoutes = require('./src/routes/live');
-
-initDatabase();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -59,7 +57,12 @@ app.use('/api', courseFileRoutes);
 
 /** Loads the logged-in user (if any) for page routing. */
 function currentUser(req) {
-  return req.session && req.session.userId ? findUserById(req.session.userId) : null;
+  return req.session && req.session.userId ? findUserById(req.session.userId) : Promise.resolve(null);
+}
+
+/** Forwards rejected asynchronous page handlers to Express' error handler. */
+function asyncHandler(handler) {
+  return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
 
 /** The landing page for a given role. */
@@ -77,114 +80,114 @@ app.get(['/', '/index.html'], (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.get('/login', (req, res) => {
-  const user = currentUser(req);
+app.get('/login', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (user) return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
-});
+}));
 
-app.get('/dashboard', (req, res) => {
-  const user = currentUser(req);
+app.get('/dashboard', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'user') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'dashboard.html'));
-});
+}));
 
-app.get('/admin', (req, res) => {
-  const user = currentUser(req);
+app.get('/admin', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
-});
+}));
 
 // Instructor - assigned courses.
-app.get('/instructor', (req, res) => {
-  const user = currentUser(req);
+app.get('/instructor', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'instructor' && user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'instructor.html'));
-});
+}));
 
 // Instructor - one course (students, attendance, assignments).
-app.get('/instructor/courses/:id', (req, res) => {
-  const user = currentUser(req);
+app.get('/instructor/courses/:id', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'instructor' && user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'instructor-course.html'));
-});
+}));
 
 // Instructor - one assignment's submissions and grading.
-app.get('/instructor/assignments/:id', (req, res) => {
-  const user = currentUser(req);
+app.get('/instructor/assignments/:id', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'instructor' && user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'instructor-assignment.html'));
-});
+}));
 
 // Coordinator - assigned courses.
-app.get('/coordinator', (req, res) => {
-  const user = currentUser(req);
+app.get('/coordinator', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'coordinator' && user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'coordinator.html'));
-});
+}));
 
 // Coordinator - one course (students and attendance).
-app.get('/coordinator/courses/:id', (req, res) => {
-  const user = currentUser(req);
+app.get('/coordinator/courses/:id', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'coordinator' && user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'coordinator-course.html'));
-});
+}));
 
 // Course detail page (course days + enrolled students + attendance).
-app.get('/admin/courses/:id', (req, res) => {
-  const user = currentUser(req);
+app.get('/admin/courses/:id', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'course.html'));
-});
+}));
 
 // Admin - assignments list.
-app.get('/admin/assignments', (req, res) => {
-  const user = currentUser(req);
+app.get('/admin/assignments', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'admin-assignments.html'));
-});
+}));
 
 // Admin - one assignment's submissions and grading.
-app.get('/admin/assignments/:id', (req, res) => {
-  const user = currentUser(req);
+app.get('/admin/assignments/:id', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'admin') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'assignment-admin.html'));
-});
+}));
 
 // Student - assignments list.
-app.get('/assignments', (req, res) => {
-  const user = currentUser(req);
+app.get('/assignments', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'user') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'assignments.html'));
-});
+}));
 
 // Student - certificates.
-app.get('/certificates', (req, res) => {
-  const user = currentUser(req);
+app.get('/certificates', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   if (user.role !== 'user') return res.redirect(homePath(user.role));
   res.sendFile(path.join(PUBLIC_DIR, 'certificates.html'));
-});
+}));
 
 // Live streaming room. Any signed-in role can open it; the room itself decides
 // what each participant may do (see the /api/live routes and the signalling
 // server). The id in the URL is the live session id.
-app.get('/live/:id', (req, res) => {
-  const user = currentUser(req);
+app.get('/live/:id', asyncHandler(async (req, res) => {
+  const user = await currentUser(req);
   if (!user) return res.redirect('/login');
   res.sendFile(path.join(PUBLIC_DIR, 'live.html'));
-});
+}));
 
 // 404 for unknown API routes.
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
@@ -218,6 +221,11 @@ app.use((err, req, res, next) => {
 const server = http.createServer(app);
 attachLiveServer(server, sessionMiddleware);
 
-server.listen(PORT, () => {
-  console.log(`LearnEra server running at http://localhost:${PORT}`);
+initDatabase().then(() => {
+  server.listen(PORT, () => {
+    console.log(`LearnEra server running at http://localhost:${PORT}`);
+  });
+}).catch((err) => {
+  console.error('LearnEra could not connect to Supabase:', err.message);
+  process.exitCode = 1;
 });

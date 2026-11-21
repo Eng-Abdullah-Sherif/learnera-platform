@@ -1,20 +1,21 @@
 /**
  * Authentication helpers and route guards.
  */
-const { findUserById, toPublicUser } = require('./db');
+const { findUserById, toPublicUser } = require('./data');
 
 /** Requires a valid session. Returns 401 otherwise. */
 function requireAuth(req, res, next) {
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  const user = findUserById(req.session.userId);
-  if (!user) {
-    req.session.destroy(() => {});
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  req.user = user;
-  next();
+  findUserById(req.session.userId).then((user) => {
+    if (!user) {
+      req.session.destroy(() => {});
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    req.user = user;
+    next();
+  }).catch(next);
 }
 
 /** Requires an admin session. Returns 403 otherwise. */

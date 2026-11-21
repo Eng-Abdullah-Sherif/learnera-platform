@@ -4,6 +4,7 @@
  */
 const path = require('path');
 const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
   findAssignment,
   listAssignmentsForCourse,
@@ -16,7 +17,7 @@ const {
   replaceSubmissionFiles,
   staffTeachesCourse,
   logActivity,
-} = require('../db');
+} = require('../data');
 const { requireAuth } = require('../auth');
 const {
   submissionUpload,
@@ -26,7 +27,7 @@ const {
   submissionsDir,
 } = require('../upload');
 
-const router = express.Router();
+const router = createAsyncRouter();
 router.use(requireAuth);
 
 const MAX_FILES = 10;
@@ -56,9 +57,13 @@ function shapeFile(row, kind) {
 }
 
 /** Shapes an assignment together with the requesting student's own submission. */
-function shapeStudentAssignment(a, userId) {
-  const sub = findSubmission(a.id, userId);
+async function shapeStudentAssignment(a, userId) {
+  const [sub, assignmentFiles] = await Promise.all([
+    findSubmission(a.id, userId),
+    listAssignmentFiles(a.id),
+  ]);
   const today = localToday();
+  const submissionFiles = sub ? await listSubmissionFiles(sub.id) : [];
   return {
     id: a.id,
     course: a.course_name || null,
@@ -67,7 +72,7 @@ function shapeStudentAssignment(a, userId) {
     due_date: a.due_date,
     max_grade: a.max_grade,
     is_overdue: today > a.due_date,
-    files: listAssignmentFiles(a.id).map((f) => shapeFile(f, 'assignment')),
+    files: assignmentFiles.map((f) => shapeFile(f, 'assignment')),
     submission: sub
       ? {
           id: sub.id,
@@ -76,7 +81,7 @@ function shapeStudentAssignment(a, userId) {
           grade: sub.grade,
           feedback: sub.feedback || '',
           graded_at: sub.graded_at,
-          files: listSubmissionFiles(sub.id).map((f) => shapeFile(f, 'submission')),
+          files: submissionFiles.map((f) => shapeFile(f, 'submission')),
         }
       : null,
   };
@@ -87,15 +92,15 @@ function shapeStudentAssignment(a, userId) {
 /* ------------------------------------------------------------------ */
 
 /** GET /api/assignments - the assignments of the student's course. */
-router.get('/assignments', (req, res) => {
+router.get('/assignments', async (req, res) => {
   if (!req.user.course_id) return res.json({ assignments: [] });
-  const rows = listAssignmentsForCourse(req.user.course_id);
-  res.json({ assignments: rows.map((a) => shapeStudentAssignment(a, req.user.id)) });
+  const rows = await listAssignmentsForCourse(req.user.course_id);
+  res.json({ assignments: await Promise.all(rows.map((a) => shapeStudentAssignment(a, req.user.id))) });
 });
 
 /** POST /api/assignments/:id/submit - upload (or replace) the student's solution. */
-router.post('/assignments/:id/submit', submissionUpload.array('files', MAX_FILES), (req, res) => {
-  const assignment = findAssignment(toId(req.params.id));
+router.post('/assignments/:id/submit', submissionUpload.array('files', MAX_FILES), async (req, res) => {
+  const assignment = await findAssignment(toId(req.params.id));
 
   const cleanup = () => {
     for (const f of req.files || []) removeFromDisk(submissionsDir, f.filename);
@@ -113,18 +118,18 @@ router.post('/assignments/:id/submit', submissionUpload.array('files', MAX_FILES
     return res.status(400).json({ error: 'Please attach at least one file' });
   }
 
-  const existing = findSubmission(assignment.id, req.user.id);
+  const existing = await findSubmission(assignment.id, req.user.id);
   if (existing && existing.grade !== null && existing.grade !== undefined) {
     cleanup();
     return res.status(400).json({ error: 'Your submission has already been graded and can no longer be changed' });
   }
 
   const isLate = localToday() > assignment.due_date;
-  const sub = upsertSubmission(assignment.id, req.user.id, isLate);
-  const removed = replaceSubmissionFiles(sub.id, toFileRows(req.files));
+  const sub = await upsertSubmission(assignment.id, req.user.id, isLate);
+  const removed = await replaceSubmissionFiles(sub.id, toFileRows(req.files));
   for (const name of removed) removeFromDisk(submissionsDir, name);
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'submission.upload',
     entity: 'submission',
@@ -133,7 +138,7 @@ router.post('/assignments/:id/submit', submissionUpload.array('files', MAX_FILES
     ip: req.ip,
   });
 
-  res.status(201).json({ assignment: shapeStudentAssignment(assignment, req.user.id) });
+  res.status(201).json({ assignment: await shapeStudentAssignment(assignment, req.user.id) });
 });
 
 /* ------------------------------------------------------------------ */
@@ -141,15 +146,15 @@ router.post('/assignments/:id/submit', submissionUpload.array('files', MAX_FILES
 /* ------------------------------------------------------------------ */
 
 /** GET /api/files/assignment/:id - download an assignment attachment. */
-router.get('/files/assignment/:id', (req, res) => {
-  const file = findAssignmentFile(toId(req.params.id));
+router.get('/files/assignment/:id', async (req, res) => {
+  const file = await findAssignmentFile(toId(req.params.id));
   if (!file) return res.status(404).json({ error: 'File not found' });
 
-  const assignment = findAssignment(file.assignment_id);
+  const assignment = await findAssignment(file.assignment_id);
   const allowed =
     req.user.role === 'admin' ||
     (assignment && assignment.course_id === req.user.course_id) ||
-    (assignment && req.user.role === 'instructor' && staffTeachesCourse(req.user.id, assignment.course_id));
+    (assignment && req.user.role === 'instructor' && await staffTeachesCourse(req.user.id, assignment.course_id));
   if (!allowed) return res.status(403).json({ error: 'You cannot access this file' });
 
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -157,14 +162,14 @@ router.get('/files/assignment/:id', (req, res) => {
 });
 
 /** GET /api/files/submission/:id - download a submission file (owner, admin, or the course instructor). */
-router.get('/files/submission/:id', (req, res) => {
-  const file = findSubmissionFile(toId(req.params.id));
+router.get('/files/submission/:id', async (req, res) => {
+  const file = await findSubmissionFile(toId(req.params.id));
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   let allowed = req.user.role === 'admin' || file.user_id === req.user.id;
   if (!allowed && req.user.role === 'instructor') {
-    const assignment = findAssignment(file.assignment_id);
-    allowed = !!(assignment && staffTeachesCourse(req.user.id, assignment.course_id));
+    const assignment = await findAssignment(file.assignment_id);
+    allowed = !!(assignment && await staffTeachesCourse(req.user.id, assignment.course_id));
   }
   if (!allowed) return res.status(403).json({ error: 'You cannot access this file' });
 

@@ -3,10 +3,11 @@
  * Mounted at /api and protected by requireAuth.
  */
 const express = require('express');
-const { listCertificatesForUser } = require('../db');
+const createAsyncRouter = require('../async-router');
+const { listCertificatesForUser } = require('../data');
 const { requireAuth } = require('../auth');
 
-const router = express.Router();
+const router = createAsyncRouter();
 router.use(requireAuth);
 
 /** Shapes a certificate row for the student page. */
@@ -23,8 +24,8 @@ function shapeCertificate(c) {
 }
 
 /** GET /api/certificates - the signed-in student's certificates. */
-router.get('/certificates', (req, res) => {
-  res.json({ certificates: listCertificatesForUser(req.user.id).map(shapeCertificate) });
+router.get('/certificates', requireAuth, async (req, res) => {
+  res.json({ certificates: (await listCertificatesForUser(req.user.id)).map(shapeCertificate) });
 });
 
 module.exports = router;

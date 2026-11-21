@@ -3,21 +3,24 @@
  * settings (every signed-in user may change their own photo and password).
  */
 const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
-  db,
   findUserByEmail,
   findUserById,
+  findCourseInfo,
+  listCourseDaysForStudent,
   verifyPassword,
   hashPassword,
+  updateUser,
   toPublicUser,
   logActivity,
-} = require('../db');
+} = require('../data');
 const { requireAuth } = require('../auth');
 const { upload, removeUploadedFile } = require('../upload');
 
-const router = express.Router();
+const router = createAsyncRouter();
 
-router.post('/login', (req, res, next) => {
+router.post('/login', async (req, res, next) => {
   const email = String((req.body && req.body.email) || '').trim();
   const password = String((req.body && req.body.password) || '');
 
@@ -25,7 +28,7 @@ router.post('/login', (req, res, next) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
   if (!user || !verifyPassword(password, user.password_hash)) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
@@ -57,22 +60,14 @@ router.get('/me', requireAuth, (req, res) => {
  * GET /api/auth/course-days - every day of the student's course (for the
  * dashboard sidebar), each tagged with whether the student attended it.
  */
-router.get('/course-days', requireAuth, (req, res) => {
-  const user = findUserById(req.user.id);
+router.get('/course-days', requireAuth, async (req, res) => {
+  const user = await findUserById(req.user.id);
   if (!user || !user.course_id) return res.json({ course: null, days: [] });
 
-  const course = db.prepare(`SELECT id, name, location_type FROM courses WHERE id = ?`).get(user.course_id);
-  const days = db
-    .prepare(
-      `SELECT cd.id, cd.day_date, cd.position,
-              EXISTS(SELECT 1 FROM attendance a
-                      WHERE a.course_day_id = cd.id AND a.user_id = @user AND a.present = 1) AS present
-         FROM course_days cd
-        WHERE cd.course_id = @course
-        ORDER BY cd.position ASC, cd.day_date ASC`
-    )
-    .all({ course: user.course_id, user: user.id })
-    .map((d) => ({ ...d, present: !!d.present }));
+  const [course, days] = await Promise.all([
+    findCourseInfo(user.course_id),
+    listCourseDaysForStudent(user.course_id, user.id),
+  ]);
 
   res.json({ course: course || null, days });
 });
@@ -81,7 +76,7 @@ router.get('/course-days', requireAuth, (req, res) => {
 const LANGUAGES = ['ar', 'en'];
 
 /** PUT /api/auth/profile - update the signed-in user's photo, password and/or language. */
-router.put('/profile', requireAuth, upload.single('photo'), (req, res) => {
+router.put('/profile', requireAuth, upload.single('photo'), async (req, res) => {
   const body = req.body || {};
   const photo = req.file ? `/uploads/${req.file.filename}` : null;
   const updates = {};
@@ -122,11 +117,7 @@ router.put('/profile', requireAuth, upload.single('photo'), (req, res) => {
   }
 
   updates.updated_at = new Date().toISOString();
-  const columns = Object.keys(updates);
-  db.prepare(`UPDATE users SET ${columns.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`).run(
-    ...columns.map((c) => updates[c]),
-    req.user.id
-  );
+  await updateUser(req.user.id, updates);
 
   // Keep the current session in sync with the chosen language.
   if (languageProvided) req.session.language = updates.language;
@@ -135,7 +126,7 @@ router.put('/profile', requireAuth, upload.single('photo'), (req, res) => {
   if (newPassword) what.push('password');
   if (photo) what.push('photo');
   if (languageProvided) what.push('language');
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'profile.update',
     entity: 'user',
@@ -144,7 +135,7 @@ router.put('/profile', requireAuth, upload.single('photo'), (req, res) => {
     ip: req.ip,
   });
 
-  res.json({ user: toPublicUser(findUserById(req.user.id)) });
+  res.json({ user: toPublicUser(await findUserById(req.user.id)) });
 });
 
 module.exports = router;

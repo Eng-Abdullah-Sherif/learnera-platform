@@ -11,8 +11,14 @@
  * days) and the attendance records can never be changed here.
  */
 const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
-  db,
+  findCourseId,
+  findCourse,
+  listCourses,
+  listCourseDays,
+  listAttendanceForCourse,
+  countStudents,
   listStaffCourses,
   staffTeachesCourse,
   listUsersByCourse,
@@ -27,7 +33,7 @@ const {
   gradeSubmission,
   deleteAssignment,
   logActivity,
-} = require('../db');
+} = require('../data');
 const { requireInstructor } = require('../auth');
 const {
   assignmentUpload,
@@ -37,7 +43,7 @@ const {
   submissionsDir,
 } = require('../upload');
 
-const router = express.Router();
+const router = createAsyncRouter();
 router.use(requireInstructor);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,8 +56,8 @@ function toId(value) {
 }
 
 /** Admins can manage every course; instructors only the ones assigned to them. */
-function canManage(user, courseId) {
-  return user.role === 'admin' || staffTeachesCourse(user.id, courseId);
+async function canManage(user, courseId) {
+  return user.role === 'admin' || await staffTeachesCourse(user.id, courseId);
 }
 
 /** Turns a stored file row into the shape sent to the client. */
@@ -83,7 +89,7 @@ function shapeAssignment(a) {
 }
 
 /** Shapes a student submission (with the student's details and files) for the client. */
-function shapeSubmission(s) {
+async function shapeSubmission(s) {
   return {
     id: s.id,
     user_id: s.user_id,
@@ -95,7 +101,7 @@ function shapeSubmission(s) {
     grade: s.grade,
     feedback: s.feedback || '',
     graded_at: s.graded_at,
-    files: listSubmissionFiles(s.id).map((f) => shapeFile(f, 'submission')),
+    files: (await listSubmissionFiles(s.id)).map((f) => shapeFile(f, 'submission')),
   };
 }
 
@@ -109,43 +115,28 @@ function cleanupFiles(req) {
 /* ------------------------------------------------------------------ */
 
 /** GET /api/instructor/courses - the courses assigned to the instructor. */
-router.get('/courses', (req, res) => {
+router.get('/courses', async (req, res) => {
   if (req.user.role === 'admin') {
-    const courses = db
-      .prepare(
-        `SELECT c.*,
-                (SELECT COUNT(*) FROM users u WHERE u.course_id = c.id AND u.role = 'user') AS students_count,
-                (SELECT COUNT(*) FROM assignments a WHERE a.course_id = c.id) AS assignments_count
-           FROM courses c ORDER BY c.name COLLATE NOCASE ASC`
-      )
-      .all();
+    const courses = await listCourses();
     return res.json({ courses });
   }
-  res.json({ courses: listStaffCourses(req.user.id) });
+  res.json({ courses: await listStaffCourses(req.user.id) });
 });
 
 /** GET /api/instructor/courses/:id - one course with students and attendance. */
-router.get('/courses/:id', (req, res) => {
+router.get('/courses/:id', async (req, res) => {
   const id = toId(req.params.id);
-  if (!canManage(req.user, id)) return res.status(403).json({ error: 'This course is not assigned to you' });
+  if (!(await canManage(req.user, id))) return res.status(403).json({ error: 'This course is not assigned to you' });
 
-  const course = db.prepare(`SELECT * FROM courses WHERE id = ?`).get(id);
+  const course = await findCourse(id);
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
-  const days = db
-    .prepare(`SELECT id, day_date, position FROM course_days WHERE course_id = ? ORDER BY position ASC, day_date ASC`)
-    .all(id);
-
-  const students = listUsersByCourse(id).map(toPublicUser);
-
-  const attendance = db
-    .prepare(
-      `SELECT a.course_day_id, a.user_id, a.present
-         FROM attendance a
-         JOIN course_days cd ON cd.id = a.course_day_id
-        WHERE cd.course_id = ?`
-    )
-    .all(id);
+  const [days, users, attendance] = await Promise.all([
+    listCourseDays(id),
+    listUsersByCourse(id),
+    listAttendanceForCourse(id),
+  ]);
+  const students = users.map(toPublicUser);
 
   res.json({ course, days, students, attendance });
 });
@@ -155,14 +146,14 @@ router.get('/courses/:id', (req, res) => {
 /* ------------------------------------------------------------------ */
 
 /** GET /api/instructor/courses/:id/assignments - the assignments of one course. */
-router.get('/courses/:id/assignments', (req, res) => {
+router.get('/courses/:id/assignments', async (req, res) => {
   const id = toId(req.params.id);
-  if (!canManage(req.user, id)) return res.status(403).json({ error: 'This course is not assigned to you' });
-  res.json({ assignments: listAssignmentsForCourse(id).map(shapeAssignment) });
+  if (!(await canManage(req.user, id))) return res.status(403).json({ error: 'This course is not assigned to you' });
+  res.json({ assignments: (await listAssignmentsForCourse(id)).map(shapeAssignment) });
 });
 
 /** POST /api/instructor/assignments - post a new assignment with attachments. */
-router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, res) => {
+router.post('/assignments', assignmentUpload.array('files', MAX_FILES), async (req, res) => {
   const body = req.body || {};
   const courseId = toId(body.course_id);
   const title = String(body.title || '').trim();
@@ -170,11 +161,11 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
   const dueDate = String(body.due_date || '').trim();
   const maxGrade = Number.parseInt(body.max_grade, 10);
 
-  if (!courseId || !db.prepare(`SELECT id FROM courses WHERE id = ?`).get(courseId)) {
+  if (!courseId || !(await findCourseId(courseId))) {
     cleanupFiles(req);
     return res.status(400).json({ error: 'The selected course does not exist' });
   }
-  if (!canManage(req.user, courseId)) {
+  if (!(await canManage(req.user, courseId))) {
     cleanupFiles(req);
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
@@ -191,7 +182,7 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
     return res.status(400).json({ error: 'The maximum grade must be a whole number between 1 and 1000' });
   }
 
-  const id = createAssignment({
+  const id = await createAssignment({
     courseId,
     title,
     description,
@@ -200,7 +191,7 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
     files: toFileRows(req.files),
   });
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'assignment.create',
     entity: 'assignment',
@@ -209,43 +200,45 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
     ip: req.ip,
   });
 
-  res.status(201).json({ assignment: shapeAssignment(findAssignment(id)) });
+  res.status(201).json({ assignment: shapeAssignment(await findAssignment(id)) });
 });
 
 /** GET /api/instructor/assignments/:id - one assignment with its submissions. */
-router.get('/assignments/:id', (req, res) => {
-  const assignment = findAssignment(toId(req.params.id));
+router.get('/assignments/:id', async (req, res) => {
+  const assignment = await findAssignment(toId(req.params.id));
   if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
-  if (!canManage(req.user, assignment.course_id)) {
+  if (!(await canManage(req.user, assignment.course_id))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
 
-  const submissions = listSubmissionsForAssignment(assignment.id).map(shapeSubmission);
-  const studentsCount = db
-    .prepare(`SELECT COUNT(*) AS c FROM users WHERE course_id = ? AND role = 'user'`)
-    .get(assignment.course_id).c;
+  const [rows, files, studentsCount] = await Promise.all([
+    listSubmissionsForAssignment(assignment.id),
+    listAssignmentFiles(assignment.id),
+    countStudents(assignment.course_id),
+  ]);
+  const submissions = await Promise.all(rows.map(shapeSubmission));
 
   res.json({
     assignment: shapeAssignment(assignment),
-    files: listAssignmentFiles(assignment.id).map((f) => shapeFile(f, 'assignment')),
+    files: files.map((f) => shapeFile(f, 'assignment')),
     submissions,
     students_count: studentsCount,
   });
 });
 
 /** DELETE /api/instructor/assignments/:id - remove an assignment posted by mistake. */
-router.delete('/assignments/:id', (req, res) => {
-  const assignment = findAssignment(toId(req.params.id));
+router.delete('/assignments/:id', async (req, res) => {
+  const assignment = await findAssignment(toId(req.params.id));
   if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
-  if (!canManage(req.user, assignment.course_id)) {
+  if (!(await canManage(req.user, assignment.course_id))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
 
-  const removed = deleteAssignment(assignment.id);
+  const removed = await deleteAssignment(assignment.id);
   for (const name of removed.assignmentFiles) removeFromDisk(assignmentsDir, name);
   for (const name of removed.submissionFiles) removeFromDisk(submissionsDir, name);
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'assignment.delete',
     entity: 'assignment',
@@ -262,13 +255,13 @@ router.delete('/assignments/:id', (req, res) => {
 /* ------------------------------------------------------------------ */
 
 /** POST /api/instructor/submissions/:id/grade - store a grade and feedback. */
-router.post('/submissions/:id/grade', (req, res) => {
+router.post('/submissions/:id/grade', async (req, res) => {
   const id = toId(req.params.id);
-  const submission = findSubmissionById(id);
+  const submission = await findSubmissionById(id);
   if (!submission) return res.status(404).json({ error: 'Submission not found' });
 
-  const assignment = findAssignment(submission.assignment_id);
-  if (!assignment || !canManage(req.user, assignment.course_id)) {
+  const assignment = await findAssignment(submission.assignment_id);
+  if (!assignment || !(await canManage(req.user, assignment.course_id))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
 
@@ -285,9 +278,9 @@ router.post('/submissions/:id/grade', (req, res) => {
     grade = Math.round(grade * 100) / 100;
   }
 
-  gradeSubmission(id, { grade, feedback, gradedBy: req.user.id });
+  await gradeSubmission(id, { grade, feedback, gradedBy: req.user.id });
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: grade === null ? 'submission.ungrade' : 'submission.grade',
     entity: 'submission',
@@ -299,7 +292,7 @@ router.post('/submissions/:id/grade', (req, res) => {
     ip: req.ip,
   });
 
-  res.json({ submission: shapeSubmission(findSubmissionById(id)) });
+  res.json({ submission: await shapeSubmission(await findSubmissionById(id)) });
 });
 
 module.exports = router;

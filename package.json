@@ -2,21 +2,25 @@
   "name": "learn-era-website",
   "version": "1.0.0",
   "private": true,
-  "description": "LearnEra platform - login with email & password, user dashboard and admin account management",
+  "description": "LearnEra platform backed by Supabase Postgres",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "migrate:sqlite": "node scripts/migrate-sqlite-to-supabase.js",
+    "test": "node --test test/supabase.test.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.5.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "express-session": "^1.18.1",
     "multer": "^2.5.0",
     "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^13.2.0"
   }
 }

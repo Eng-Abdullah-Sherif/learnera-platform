@@ -33,7 +33,7 @@ const {
   recordLiveEvent,
   markLiveHostJoined,
   markLiveHostLeft,
-} = require('./db');
+} = require('./data');
 
 /** sessionId -> room { id, courseId, hostId, session, conns: Map<peerId, conn> } */
 const rooms = new Map();
@@ -88,10 +88,10 @@ function peerShape(conn) {
 }
 
 /** Loads (or lazily opens) the room of a live session. */
-function openRoom(sessionId) {
+async function openRoom(sessionId) {
   let room = rooms.get(sessionId);
   if (room) return room;
-  const session = findLiveSession(sessionId);
+  const session = await findLiveSession(sessionId);
   if (!session || session.status !== 'live') return null;
   room = { id: session.id, courseId: session.course_id, hostId: session.host_id, session, conns: new Map() };
   rooms.set(sessionId, room);
@@ -143,16 +143,16 @@ function flushMic(conn) {
  * Logs a microphone transition and keeps the on-air timer in sync.
  * `wasMic` is the state before the change so no-op toggles are ignored.
  */
-function trackMicChange(room, target, wasMic) {
+async function trackMicChange(room, target, wasMic) {
   if (wasMic === target.mic) return;
   try {
     if (target.mic) {
       micOn(target);
-      bumpLiveMicOpens(room.id, target.user.id);
-      recordLiveEvent({ sessionId: room.id, userId: target.user.id, event: 'mic-on' });
+      await bumpLiveMicOpens(room.id, target.user.id);
+      await recordLiveEvent({ sessionId: room.id, userId: target.user.id, event: 'mic-on' });
     } else {
       micOff(target);
-      recordLiveEvent({ sessionId: room.id, userId: target.user.id, event: 'mic-off' });
+      await recordLiveEvent({ sessionId: room.id, userId: target.user.id, event: 'mic-off' });
     }
     notifyLogActivity(room.session);
   } catch {
@@ -161,18 +161,18 @@ function trackMicChange(room, target, wasMic) {
 }
 
 /** Persists a participant's departure (presence + microphone time) to the log. */
-function logLeave(conn) {
+async function logLeave(conn) {
   const room = conn.room;
   if (!room || !conn.joinedAt) return;
   try {
-    leaveLiveParticipant({
+    await leaveLiveParticipant({
       sessionId: room.id,
       userId: conn.user.id,
       durationSecs: (Date.now() - conn.joinedAt) / 1000,
       micSecs: flushMic(conn),
     });
-    recordLiveEvent({ sessionId: room.id, userId: conn.user.id, event: 'leave' });
-    if (conn.isHost) markLiveHostLeft(room.id);
+    await recordLiveEvent({ sessionId: room.id, userId: conn.user.id, event: 'leave' });
+    if (conn.isHost) await markLiveHostLeft(room.id);
     notifyLogActivity(room.session);
   } catch {
     /* logging must never break the room */
@@ -181,10 +181,10 @@ function logLeave(conn) {
 }
 
 /** Detaches a connection from its room and tells the remaining peers. */
-function leaveRoom(conn) {
+async function leaveRoom(conn) {
   const room = conn.room;
   if (!room) return;
-  logLeave(conn);
+  await logLeave(conn);
   conn.room = null;
   room.conns.delete(conn.peerId);
   broadcast(room, { type: 'peer-left', id: conn.peerId }, conn.peerId);
@@ -192,10 +192,10 @@ function leaveRoom(conn) {
 }
 
 /** Force-closes every connection of a room (logging each departure first). */
-function closeRoom(room) {
+async function closeRoom(room) {
   rooms.delete(room.id);
   for (const conn of [...room.conns.values()]) {
-    logLeave(conn);
+    await logLeave(conn);
     conn.room = null;
     try {
       conn.ws.close();
@@ -209,16 +209,16 @@ function closeRoom(room) {
 /* ------------------------------ room logic ------------------------------ */
 
 /** Handles "join": validates access and registers the connection in the room. */
-function handleJoin(conn, sessionId) {
-  leaveRoom(conn);
-  const room = openRoom(sessionId);
+async function handleJoin(conn, sessionId) {
+  await leaveRoom(conn);
+  const room = await openRoom(sessionId);
   if (!room) return send(conn.ws, { type: 'error', message: 'This session is not live' });
 
   const user = conn.user;
   const isAdmin = user.role === 'admin';
   const isHost = room.hostId === user.id;
   const isStaff = user.role === 'instructor' || user.role === 'coordinator';
-  const assigned = isStaff && staffTeachesCourse(user.id, room.courseId);
+  const assigned = isStaff && await staffTeachesCourse(user.id, room.courseId);
   const enrolled = user.role === 'user' && user.course_id === room.courseId;
 
   if (!isAdmin && !isHost && !assigned && !enrolled) {
@@ -238,10 +238,10 @@ function handleJoin(conn, sessionId) {
   // Log the entry: presence starts now, and a host entering also opens the
   // "teaching window" that frames the whole session's completion figures.
   try {
-    joinLiveParticipant({ sessionId: room.id, userId: user.id, isHost, publisher: conn.publisher });
-    recordLiveEvent({ sessionId: room.id, userId: user.id, event: 'join' });
+    await joinLiveParticipant({ sessionId: room.id, userId: user.id, isHost, publisher: conn.publisher });
+    await recordLiveEvent({ sessionId: room.id, userId: user.id, event: 'join' });
     conn.joinedAt = Date.now();
-    if (isHost) markLiveHostJoined(room.id);
+    if (isHost) await markLiveHostJoined(room.id);
     if (conn.mic) micOn(conn); // staff start with the microphone open
     notifyLogActivity(room.session);
   } catch {
@@ -280,7 +280,7 @@ function handleHand(conn, message) {
 }
 
 /** Staff grants or revokes a participant's microphone. */
-function handleMic(conn, message) {
+async function handleMic(conn, message) {
   if (!conn.room) return;
   if (!conn.publisher) return send(conn.ws, { type: 'error', message: 'Not allowed' });
   const target = findConn(conn.room, message);
@@ -288,7 +288,7 @@ function handleMic(conn, message) {
   const wasMic = target.mic;
   target.mic = message.type === 'grant-mic';
   if (!target.mic) target.hand = false;
-  trackMicChange(conn.room, target, wasMic);
+  await trackMicChange(conn.room, target, wasMic);
   broadcast(conn.room, {
     type: 'mic',
     peerId: target.peerId,
@@ -306,7 +306,7 @@ function handleMic(conn, message) {
  * client-side auto-mute that fires after a moment of silence). Re-enabling the
  * microphone still requires the host, so the gate is never bypassed.
  */
-function handleSelfMic(conn, message) {
+async function handleSelfMic(conn, message) {
   if (!conn.room) return;
   if (conn.publisher) return; // staff control their own mic through "host-mic"
   if (message.on !== false) {
@@ -318,7 +318,7 @@ function handleSelfMic(conn, message) {
   conn.hand = false;
   micOff(conn);
   try {
-    recordLiveEvent({ sessionId: room.id, userId: conn.user.id, event: 'mic-off' });
+    await recordLiveEvent({ sessionId: room.id, userId: conn.user.id, event: 'mic-off' });
     notifyLogActivity(room.session);
   } catch {
     /* logging must never break the room */
@@ -341,62 +341,62 @@ function handleScreen(conn, message) {
 }
 
 /** A broadcaster toggles their own microphone. */
-function handleHostMic(conn, message) {
+async function handleHostMic(conn, message) {
   if (!conn.room) return;
   if (!conn.publisher) return send(conn.ws, { type: 'error', message: 'Not allowed' });
   const wasMic = conn.mic;
   conn.mic = !!message.on;
-  trackMicChange(conn.room, conn, wasMic);
+  await trackMicChange(conn.room, conn, wasMic);
   broadcast(conn.room, { type: 'host-mic', peerId: conn.peerId, on: conn.mic });
 }
 
 /** Staff ends the whole session. */
-function handleEnd(conn) {
+async function handleEnd(conn) {
   if (!conn.room) return;
   if (!conn.publisher) return send(conn.ws, { type: 'error', message: 'Not allowed' });
   const room = conn.room;
-  endLiveSession(room.id);
-  const ended = findLiveSession(room.id);
+  await endLiveSession(room.id);
+  const ended = await findLiveSession(room.id);
   broadcast(room, { type: 'ended', reason: 'host' });
-  closeRoom(room);
+  await closeRoom(room);
   if (ended) notifySessionEnded(ended);
 }
 
 /** Subscribes a connection to lobby notifications. */
-function handleWatch(conn) {
+async function handleWatch(conn) {
   conn.watching = true;
   watchers.add(conn);
   send(conn.ws, {
     type: 'lobby-init',
-    sessions: listLiveSessionsForUser(conn.user).map(sessionShape),
+    sessions: (await listLiveSessionsForUser(conn.user)).map(sessionShape),
   });
 }
 
 /** Routes every inbound client message. */
-function handleMessage(conn, message) {
+async function handleMessage(conn, message) {
   if (!message || typeof message.type !== 'string') return;
   switch (message.type) {
     case 'watch':
-      return handleWatch(conn);
+      return await handleWatch(conn);
     case 'join':
-      return handleJoin(conn, Number(message.sessionId));
+      return await handleJoin(conn, Number(message.sessionId));
     case 'leave':
-      return leaveRoom(conn);
+      return await leaveRoom(conn);
     case 'signal':
       return handleSignal(conn, message);
     case 'hand':
       return handleHand(conn, message);
     case 'grant-mic':
     case 'revoke-mic':
-      return handleMic(conn, message);
+      return await handleMic(conn, message);
     case 'self-mic':
-      return handleSelfMic(conn, message);
+      return await handleSelfMic(conn, message);
     case 'screen':
       return handleScreen(conn, message);
     case 'host-mic':
-      return handleHostMic(conn, message);
+      return await handleHostMic(conn, message);
     case 'end':
-      return handleEnd(conn);
+      return await handleEnd(conn);
     default:
       return undefined;
   }
@@ -435,17 +435,17 @@ function onConnection(ws, req, user) {
     } catch {
       return;
     }
-    handleMessage(conn, message);
+    handleMessage(conn, message).catch(() => {});
   });
 
   ws.on('close', () => {
     watchers.delete(conn);
-    leaveRoom(conn);
+    leaveRoom(conn).catch(() => {});
   });
 
   ws.on('error', () => {
     watchers.delete(conn);
-    leaveRoom(conn);
+    leaveRoom(conn).catch(() => {});
   });
 }
 
@@ -455,7 +455,7 @@ function onConnection(ws, req, user) {
 function isRelevant(user, courseId) {
   if (user.role === 'admin') return true;
   if (user.role === 'user') return user.course_id === courseId;
-  return staffTeachesCourse(user.id, courseId);
+  return String(user.taught_ids || '').split(',').map(Number).includes(Number(courseId));
 }
 
 /** Pushes a "session started" event to every relevant watcher. */
@@ -486,7 +486,7 @@ function notifyLogActivity(session) {
     const user = conn.user;
     const isStaffViewer =
       user.role === 'admin' ||
-      ((user.role === 'instructor' || user.role === 'coordinator') && staffTeachesCourse(user.id, session.course_id));
+      ((user.role === 'instructor' || user.role === 'coordinator') && isRelevant(user, session.course_id));
     if (isStaffViewer) send(conn.ws, payload);
   }
 }
@@ -496,7 +496,7 @@ function closeSessionRoom(sessionId) {
   const room = rooms.get(sessionId);
   if (!room) return;
   broadcast(room, { type: 'ended', reason: 'host' });
-  closeRoom(room);
+  closeRoom(room).catch(() => {});
 }
 
 /**
@@ -521,9 +521,14 @@ function attachLiveServer(httpServer, sessionMiddleware) {
 
     // Reuse the Express session: parse the cookie on the upgrade request.
     const fakeRes = new http.ServerResponse(req);
-    sessionMiddleware(req, fakeRes, () => {
+    sessionMiddleware(req, fakeRes, async () => {
       const userId = req.session && req.session.userId;
-      const user = userId ? findUserById(userId) : null;
+      let user = null;
+      try {
+        user = userId ? await findUserById(userId) : null;
+      } catch {
+        user = null;
+      }
       if (!user) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();

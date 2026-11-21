@@ -3,18 +3,20 @@
  * Mounted at /api/admin and protected by requireAdmin.
  */
 const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
-  db,
+  findStudentId,
+  findCourseId,
   listCertificates,
   findCertificate,
   createCertificate,
   updateCertificate,
   deleteCertificate,
   logActivity,
-} = require('../db');
+} = require('../data');
 const { requireAdmin } = require('../auth');
 
-const router = express.Router();
+const router = createAsyncRouter();
 router.use(requireAdmin);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -46,9 +48,9 @@ function shapeCertificate(c) {
  * Validates the shared certificate fields. Returns
  * `{ error }` on failure or `{ userId, courseId, title, body, issuedDate }`.
  */
-function readFields(body) {
+async function readFields(body) {
   const userId = toId(body.user_id);
-  if (!userId || !db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'user'`).get(userId)) {
+  if (!userId || !(await findStudentId(userId))) {
     return { error: 'The selected student does not exist' };
   }
 
@@ -63,7 +65,7 @@ function readFields(body) {
   let courseId = null;
   if (body.course_id !== undefined && String(body.course_id).trim() !== '') {
     courseId = toId(body.course_id);
-    if (!courseId || !db.prepare(`SELECT id FROM courses WHERE id = ?`).get(courseId)) {
+    if (!courseId || !(await findCourseId(courseId))) {
       return { error: 'The selected course does not exist' };
     }
   }
@@ -72,18 +74,18 @@ function readFields(body) {
 }
 
 /** GET /api/admin/certificates - every certificate. */
-router.get('/certificates', (req, res) => {
-  res.json({ certificates: listCertificates().map(shapeCertificate) });
+router.get('/certificates', async (req, res) => {
+  res.json({ certificates: (await listCertificates()).map(shapeCertificate) });
 });
 
 /** POST /api/admin/certificates - issue a certificate to a student. */
-router.post('/certificates', (req, res) => {
-  const fields = readFields(req.body || {});
+router.post('/certificates', async (req, res) => {
+  const fields = await readFields(req.body || {});
   if (fields.error) return res.status(400).json({ error: fields.error });
 
-  const id = createCertificate({ ...fields, createdBy: req.user.id });
+  const { id } = await createCertificate({ ...fields, createdBy: req.user.id });
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'certificate.create',
     entity: 'certificate',
@@ -92,21 +94,21 @@ router.post('/certificates', (req, res) => {
     ip: req.ip,
   });
 
-  res.status(201).json({ certificate: shapeCertificate(findCertificate(id)) });
+  res.status(201).json({ certificate: shapeCertificate(await findCertificate(id)) });
 });
 
 /** PUT /api/admin/certificates/:id - update a certificate. */
-router.put('/certificates/:id', (req, res) => {
+router.put('/certificates/:id', async (req, res) => {
   const id = toId(req.params.id);
-  const existing = findCertificate(id);
+  const existing = await findCertificate(id);
   if (!existing) return res.status(404).json({ error: 'Certificate not found' });
 
-  const fields = readFields(req.body || {});
+  const fields = await readFields(req.body || {});
   if (fields.error) return res.status(400).json({ error: fields.error });
 
-  updateCertificate(id, fields);
+  await updateCertificate(id, fields);
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'certificate.update',
     entity: 'certificate',
@@ -115,18 +117,18 @@ router.put('/certificates/:id', (req, res) => {
     ip: req.ip,
   });
 
-  res.json({ certificate: shapeCertificate(findCertificate(id)) });
+  res.json({ certificate: shapeCertificate(await findCertificate(id)) });
 });
 
 /** DELETE /api/admin/certificates/:id - delete a certificate. */
-router.delete('/certificates/:id', (req, res) => {
+router.delete('/certificates/:id', async (req, res) => {
   const id = toId(req.params.id);
-  const existing = findCertificate(id);
+  const existing = await findCertificate(id);
   if (!existing) return res.status(404).json({ error: 'Certificate not found' });
 
-  deleteCertificate(id);
+  await deleteCertificate(id);
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'certificate.delete',
     entity: 'certificate',

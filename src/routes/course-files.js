@@ -9,18 +9,19 @@
  */
 const path = require('path');
 const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
-  db,
+  findCourseId,
   staffTeachesCourse,
   listCourseFiles,
   findCourseFile,
   addCourseFile,
   deleteCourseFile,
-} = require('../db');
+} = require('../data');
 const { requireAuth } = require('../auth');
 const { courseFileUpload, courseFilesDir, toFileRows, removeFromDisk } = require('../upload');
 
-const router = express.Router();
+const router = createAsyncRouter();
 
 /** Parses an id from a request value. */
 function toId(value) {
@@ -29,14 +30,14 @@ function toId(value) {
 }
 
 /** Admins and coordinators may upload/remove course files. */
-function canManageCourse(user, courseId) {
+async function canManageCourse(user, courseId) {
   if (user.role === 'admin') return true;
   if (user.role === 'coordinator') return staffTeachesCourse(user.id, courseId);
   return false;
 }
 
 /** Any member of the course may read its shared files. */
-function canViewCourse(user, courseId) {
+async function canViewCourse(user, courseId) {
   if (user.role === 'admin') return true;
   if (user.role === 'user') return user.course_id === courseId;
   return staffTeachesCourse(user.id, courseId);
@@ -56,16 +57,16 @@ function shape(row) {
 }
 
 /** GET /api/courses/:id/files - the shared files of a course. */
-router.get('/courses/:id/files', requireAuth, (req, res) => {
+router.get('/courses/:id/files', requireAuth, async (req, res) => {
   const courseId = toId(req.params.id);
-  if (!canViewCourse(req.user, courseId)) {
+  if (!(await canViewCourse(req.user, courseId))) {
     return res.status(403).json({ error: 'This course is not available to you' });
   }
-  res.json({ files: listCourseFiles(courseId).map(shape) });
+  res.json({ files: (await listCourseFiles(courseId)).map(shape) });
 });
 
 /** POST /api/courses/:id/files - upload one or more files for a course. */
-router.post('/courses/:id/files', requireAuth, courseFileUpload.array('files', 10), (req, res) => {
+router.post('/courses/:id/files', requireAuth, courseFileUpload.array('files', 10), async (req, res) => {
   const courseId = toId(req.params.id);
   const files = toFileRows(req.files);
 
@@ -74,13 +75,13 @@ router.post('/courses/:id/files', requireAuth, courseFileUpload.array('files', 1
     return res.status(status).json({ error });
   };
 
-  const course = db.prepare(`SELECT id FROM courses WHERE id = ?`).get(courseId);
+  const course = await findCourseId(courseId);
   if (!course) return fail(404, 'Course not found');
-  if (!canManageCourse(req.user, courseId)) return fail(403, 'This course is not assigned to you');
+  if (!(await canManageCourse(req.user, courseId))) return fail(403, 'This course is not assigned to you');
   if (!files.length) return fail(400, 'Please choose at least one file to upload');
 
   for (const f of files) {
-    addCourseFile({
+    await addCourseFile({
       courseId,
       uploadedBy: req.user.id,
       storedName: f.storedName,
@@ -90,21 +91,21 @@ router.post('/courses/:id/files', requireAuth, courseFileUpload.array('files', 1
     });
   }
 
-  res.status(201).json({ files: listCourseFiles(courseId).map(shape) });
+  res.status(201).json({ files: (await listCourseFiles(courseId)).map(shape) });
 });
 
 /** DELETE /api/courses/:id/files/:fileId - remove a course file. */
-router.delete('/courses/:id/files/:fileId', requireAuth, (req, res) => {
+router.delete('/courses/:id/files/:fileId', requireAuth, async (req, res) => {
   const courseId = toId(req.params.id);
   const fileId = toId(req.params.fileId);
-  if (!canManageCourse(req.user, courseId)) {
+  if (!(await canManageCourse(req.user, courseId))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
-  const file = findCourseFile(fileId);
+  const file = await findCourseFile(fileId);
   if (!file || file.course_id !== courseId) {
     return res.status(404).json({ error: 'File not found' });
   }
-  deleteCourseFile(fileId);
+  await deleteCourseFile(fileId);
   removeFromDisk(courseFilesDir, file.stored_name);
   res.json({ ok: true });
 });
@@ -114,10 +115,10 @@ router.delete('/courses/:id/files/:fileId', requireAuth, (req, res) => {
  * PDFs and images open inline in the browser; anything else downloads with its
  * original name. Add ?download=1 to force a download.
  */
-router.get('/files/:id', requireAuth, (req, res) => {
-  const file = findCourseFile(toId(req.params.id));
+router.get('/files/:id', requireAuth, async (req, res) => {
+  const file = await findCourseFile(toId(req.params.id));
   if (!file) return res.status(404).json({ error: 'File not found' });
-  if (!canViewCourse(req.user, file.course_id)) {
+  if (!(await canViewCourse(req.user, file.course_id))) {
     return res.status(403).json({ error: 'This file is not available to you' });
   }
 

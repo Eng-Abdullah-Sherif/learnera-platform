@@ -10,10 +10,10 @@
  *
  * Mounted at /api.
  */
-const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
-  db,
   staffTeachesCourse,
+  findCourseId,
   listAnnouncementsForUser,
   listAnnouncementsForCourse,
   findAnnouncement,
@@ -21,10 +21,10 @@ const {
   updateAnnouncement,
   deleteAnnouncement,
   markAnnouncementsRead,
-} = require('../db');
+} = require('../data');
 const { requireAuth } = require('../auth');
 
-const router = express.Router();
+const router = createAsyncRouter();
 
 /** Parses an id from a request value. */
 function toId(value) {
@@ -38,8 +38,8 @@ function canManage(user) {
 }
 
 /** Admins reach every course; coordinators only the ones assigned to them. */
-function canManageCourse(user, courseId) {
-  return user.role === 'admin' || staffTeachesCourse(user.id, courseId);
+async function canManageCourse(user, courseId) {
+  return user.role === 'admin' || await staffTeachesCourse(user.id, courseId);
 }
 
 /** Accepts only YYYY-MM-DD date strings (anything else becomes null). */
@@ -75,8 +75,8 @@ function readFields(body) {
 }
 
 /** GET /api/announcements - the signed-in user's feed with the unread count. */
-router.get('/announcements', requireAuth, (req, res) => {
-  const rows = listAnnouncementsForUser(req.user);
+router.get('/announcements', requireAuth, async (req, res) => {
+  const rows = await listAnnouncementsForUser(req.user);
   const announcements = rows.map(shape);
   res.json({
     announcements,
@@ -85,28 +85,28 @@ router.get('/announcements', requireAuth, (req, res) => {
 });
 
 /** POST /api/announcements/read - mark the given (or every) announcement as read. */
-router.post('/announcements/read', requireAuth, (req, res) => {
+router.post('/announcements/read', requireAuth, async (req, res) => {
   const body = req.body || {};
   let ids;
   if (body.all) {
-    ids = listAnnouncementsForUser(req.user, 500).map((a) => a.id);
+    ids = (await listAnnouncementsForUser(req.user, 500)).map((a) => a.id);
   } else {
     ids = (Array.isArray(body.ids) ? body.ids : []).map(toId).filter((id) => id !== null);
   }
-  if (ids.length) markAnnouncementsRead(req.user.id, ids);
+  if (ids.length) await markAnnouncementsRead(req.user.id, ids);
 
-  const rows = listAnnouncementsForUser(req.user);
+  const rows = await listAnnouncementsForUser(req.user);
   res.json({ unread_count: rows.filter((a) => !a.is_read).length });
 });
 
 /** GET /api/announcements/course/:id - a course's announcements (for its managers). */
-router.get('/announcements/course/:id', requireAuth, (req, res) => {
+router.get('/announcements/course/:id', requireAuth, async (req, res) => {
   const courseId = toId(req.params.id);
   if (!canManage(req.user)) return res.status(403).json({ error: 'Not allowed' });
-  if (!canManageCourse(req.user, courseId)) {
+  if (!(await canManageCourse(req.user, courseId))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
-  res.json({ announcements: listAnnouncementsForCourse(courseId).map(shape) });
+  res.json({ announcements: (await listAnnouncementsForCourse(courseId)).map(shape) });
 });
 
 /**
@@ -114,54 +114,56 @@ router.get('/announcements/course/:id', requireAuth, (req, res) => {
  * Deliberately does not accept multipart uploads, so file attachments are not
  * possible here (share files through the course files section instead).
  */
-router.post('/announcements/course/:id', requireAuth, (req, res) => {
+router.post('/announcements/course/:id', requireAuth, async (req, res) => {
   const courseId = toId(req.params.id);
   if (!canManage(req.user)) return res.status(403).json({ error: 'Not allowed' });
-  if (!canManageCourse(req.user, courseId)) {
+  if (!(await canManageCourse(req.user, courseId))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
-  const course = db.prepare(`SELECT id FROM courses WHERE id = ?`).get(courseId);
+  const course = await findCourseId(courseId);
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
   const { title, body, publishDate } = readFields(req.body);
   if (!title) return res.status(400).json({ error: 'Announcement title is required' });
 
-  const id = createAnnouncement({ courseId, authorId: req.user.id, title, body, publishDate });
+  const { id } = await createAnnouncement({ courseId, authorId: req.user.id, title, body, publishDate });
+  const announcements = await listAnnouncementsForCourse(courseId);
   res.status(201).json({
-    announcement: shape(listAnnouncementsForCourse(courseId).find((a) => a.id === id)),
+    announcement: shape(announcements.find((a) => a.id === id)),
   });
 });
 
 /** PUT /api/announcements/:id - edit an announcement. */
-router.put('/announcements/:id', requireAuth, (req, res) => {
+router.put('/announcements/:id', requireAuth, async (req, res) => {
   const id = toId(req.params.id);
-  const existing = findAnnouncement(id);
+  const existing = await findAnnouncement(id);
   if (!existing) return res.status(404).json({ error: 'Announcement not found' });
   if (!canManage(req.user)) return res.status(403).json({ error: 'Not allowed' });
-  if (!canManageCourse(req.user, existing.course_id)) {
+  if (!(await canManageCourse(req.user, existing.course_id))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
 
   const { title, body, publishDate } = readFields(req.body);
   if (!title) return res.status(400).json({ error: 'Announcement title is required' });
 
-  updateAnnouncement(id, { title, body, publishDate });
+  await updateAnnouncement(id, { title, body, publishDate });
+  const announcements = await listAnnouncementsForCourse(existing.course_id);
   res.json({
-    announcement: shape(listAnnouncementsForCourse(existing.course_id).find((a) => a.id === id)),
+    announcement: shape(announcements.find((a) => a.id === id)),
   });
 });
 
 /** DELETE /api/announcements/:id - remove an announcement. */
-router.delete('/announcements/:id', requireAuth, (req, res) => {
+router.delete('/announcements/:id', requireAuth, async (req, res) => {
   const id = toId(req.params.id);
-  const existing = findAnnouncement(id);
+  const existing = await findAnnouncement(id);
   if (!existing) return res.status(404).json({ error: 'Announcement not found' });
   if (!canManage(req.user)) return res.status(403).json({ error: 'Not allowed' });
-  if (!canManageCourse(req.user, existing.course_id)) {
+  if (!(await canManageCourse(req.user, existing.course_id))) {
     return res.status(403).json({ error: 'This course is not assigned to you' });
   }
 
-  deleteAnnouncement(id);
+  await deleteAnnouncement(id);
   res.json({ ok: true });
 });
 

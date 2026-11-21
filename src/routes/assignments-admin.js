@@ -3,8 +3,10 @@
  * Mounted at /api/admin and protected by requireAdmin.
  */
 const express = require('express');
+const createAsyncRouter = require('../async-router');
 const {
-  db,
+  findCourseId,
+  countStudents,
   createAssignment,
   findAssignment,
   listAssignments,
@@ -20,7 +22,7 @@ const {
   gradeSubmission,
   logActivity,
   listActivityLogs,
-} = require('../db');
+} = require('../data');
 const { requireAdmin } = require('../auth');
 const {
   assignmentUpload,
@@ -30,7 +32,7 @@ const {
   submissionsDir,
 } = require('../upload');
 
-const router = express.Router();
+const router = createAsyncRouter();
 router.use(requireAdmin);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -71,7 +73,7 @@ function shapeAssignment(a) {
 }
 
 /** Shapes a submission row (with the student's name and files) for the client. */
-function shapeSubmission(s) {
+async function shapeSubmission(s) {
   return {
     id: s.id,
     user_id: s.user_id,
@@ -82,7 +84,7 @@ function shapeSubmission(s) {
     grade: s.grade,
     feedback: s.feedback || '',
     graded_at: s.graded_at,
-    files: listSubmissionFiles(s.id).map((f) => shapeFile(f, 'submission')),
+    files: (await listSubmissionFiles(s.id)).map((f) => shapeFile(f, 'submission')),
   };
 }
 
@@ -96,12 +98,12 @@ function cleanupFiles(req) {
 /* ------------------------------------------------------------------ */
 
 /** GET /api/admin/assignments - every assignment. */
-router.get('/assignments', (req, res) => {
-  res.json({ assignments: listAssignments().map(shapeAssignment) });
+router.get('/assignments', async (req, res) => {
+  res.json({ assignments: (await listAssignments()).map(shapeAssignment) });
 });
 
 /** POST /api/admin/assignments - create an assignment with attachments. */
-router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, res) => {
+router.post('/assignments', assignmentUpload.array('files', MAX_FILES), async (req, res) => {
   const body = req.body || {};
   const courseId = toId(body.course_id);
   const title = String(body.title || '').trim();
@@ -109,7 +111,7 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
   const dueDate = String(body.due_date || '').trim();
   const maxGrade = Number.parseInt(body.max_grade, 10);
 
-  if (!courseId || !db.prepare(`SELECT id FROM courses WHERE id = ?`).get(courseId)) {
+  if (!courseId || !(await findCourseId(courseId))) {
     cleanupFiles(req);
     return res.status(400).json({ error: 'The selected course does not exist' });
   }
@@ -126,7 +128,7 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
     return res.status(400).json({ error: 'The maximum grade must be a whole number between 1 and 1000' });
   }
 
-  const id = createAssignment({
+  const id = await createAssignment({
     courseId,
     title,
     description,
@@ -135,7 +137,7 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
     files: toFileRows(req.files),
   });
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'assignment.create',
     entity: 'assignment',
@@ -144,32 +146,34 @@ router.post('/assignments', assignmentUpload.array('files', MAX_FILES), (req, re
     ip: req.ip,
   });
 
-  res.status(201).json({ assignment: shapeAssignment(findAssignment(id)) });
+  res.status(201).json({ assignment: shapeAssignment(await findAssignment(id)) });
 });
 
 /** GET /api/admin/assignments/:id - assignment detail with every submission. */
-router.get('/assignments/:id', (req, res) => {
+router.get('/assignments/:id', async (req, res) => {
   const id = toId(req.params.id);
-  const assignment = findAssignment(id);
+  const assignment = await findAssignment(id);
   if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
 
-  const submissions = listSubmissionsForAssignment(id).map(shapeSubmission);
-  const studentsCount = db
-    .prepare(`SELECT COUNT(*) AS c FROM users WHERE course_id = ? AND role = 'user'`)
-    .get(assignment.course_id).c;
+  const [rows, assignmentFiles, studentsCount] = await Promise.all([
+    listSubmissionsForAssignment(id),
+    listAssignmentFiles(id),
+    countStudents(assignment.course_id),
+  ]);
+  const submissions = await Promise.all(rows.map(shapeSubmission));
 
   res.json({
     assignment: shapeAssignment(assignment),
-    files: listAssignmentFiles(id).map((f) => shapeFile(f, 'assignment')),
+    files: assignmentFiles.map((f) => shapeFile(f, 'assignment')),
     submissions,
     students_count: studentsCount,
   });
 });
 
 /** PUT /api/admin/assignments/:id - update metadata and/or attach more files. */
-router.put('/assignments/:id', assignmentUpload.array('files', MAX_FILES), (req, res) => {
+router.put('/assignments/:id', assignmentUpload.array('files', MAX_FILES), async (req, res) => {
   const id = toId(req.params.id);
-  const assignment = findAssignment(id);
+  const assignment = await findAssignment(id);
   if (!assignment) {
     cleanupFiles(req);
     return res.status(404).json({ error: 'Assignment not found' });
@@ -204,10 +208,10 @@ router.put('/assignments/:id', assignmentUpload.array('files', MAX_FILES), (req,
     updates.max_grade = maxGrade;
   }
 
-  updateAssignment(id, updates);
-  if (req.files && req.files.length) addAssignmentFiles(id, toFileRows(req.files));
+  await updateAssignment(id, updates);
+  if (req.files && req.files.length) await addAssignmentFiles(id, toFileRows(req.files));
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'assignment.update',
     entity: 'assignment',
@@ -216,20 +220,20 @@ router.put('/assignments/:id', assignmentUpload.array('files', MAX_FILES), (req,
     ip: req.ip,
   });
 
-  res.json({ assignment: shapeAssignment(findAssignment(id)) });
+  res.json({ assignment: shapeAssignment(await findAssignment(id)) });
 });
 
 /** DELETE /api/admin/assignments/:id - delete an assignment, its files and submissions. */
-router.delete('/assignments/:id', (req, res) => {
+router.delete('/assignments/:id', async (req, res) => {
   const id = toId(req.params.id);
-  const assignment = findAssignment(id);
+  const assignment = await findAssignment(id);
   if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
 
-  const removed = deleteAssignment(id);
+  const removed = await deleteAssignment(id);
   for (const name of removed.assignmentFiles) removeFromDisk(assignmentsDir, name);
   for (const name of removed.submissionFiles) removeFromDisk(submissionsDir, name);
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'assignment.delete',
     entity: 'assignment',
@@ -242,15 +246,15 @@ router.delete('/assignments/:id', (req, res) => {
 });
 
 /** DELETE /api/admin/assignment-files/:id - remove one attachment. */
-router.delete('/assignment-files/:id', (req, res) => {
+router.delete('/assignment-files/:id', async (req, res) => {
   const id = toId(req.params.id);
-  const file = findAssignmentFile(id);
+  const file = await findAssignmentFile(id);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
-  deleteAssignmentFile(id);
+  await deleteAssignmentFile(id);
   removeFromDisk(assignmentsDir, file.stored_name);
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: 'assignment.file.delete',
     entity: 'assignment_file',
@@ -267,12 +271,12 @@ router.delete('/assignment-files/:id', (req, res) => {
 /* ------------------------------------------------------------------ */
 
 /** POST /api/admin/submissions/:id/grade - store a numeric grade and feedback. */
-router.post('/submissions/:id/grade', (req, res) => {
+router.post('/submissions/:id/grade', async (req, res) => {
   const id = toId(req.params.id);
-  const submission = findSubmissionById(id);
+  const submission = await findSubmissionById(id);
   if (!submission) return res.status(404).json({ error: 'Submission not found' });
 
-  const assignment = findAssignment(submission.assignment_id);
+  const assignment = await findAssignment(submission.assignment_id);
   const body = req.body || {};
   const rawGrade = body.grade;
   const feedback = String(body.feedback || '').trim();
@@ -286,9 +290,9 @@ router.post('/submissions/:id/grade', (req, res) => {
     grade = Math.round(grade * 100) / 100;
   }
 
-  gradeSubmission(id, { grade, feedback, gradedBy: req.user.id });
+  await gradeSubmission(id, { grade, feedback, gradedBy: req.user.id });
 
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     action: grade === null ? 'submission.ungrade' : 'submission.grade',
     entity: 'submission',
@@ -300,7 +304,7 @@ router.post('/submissions/:id/grade', (req, res) => {
     ip: req.ip,
   });
 
-  res.json({ submission: shapeSubmission(findSubmissionById(id)) });
+  res.json({ submission: await shapeSubmission(await findSubmissionById(id)) });
 });
 
 /* ------------------------------------------------------------------ */
@@ -308,9 +312,9 @@ router.post('/submissions/:id/grade', (req, res) => {
 /* ------------------------------------------------------------------ */
 
 /** GET /api/admin/logs - the most recent activity entries. */
-router.get('/logs', (req, res) => {
+router.get('/logs', async (req, res) => {
   const limit = Math.min(Math.max(toId(req.query.limit) || 100, 1), 500);
-  res.json({ logs: listActivityLogs(limit) });
+  res.json({ logs: await listActivityLogs(limit) });
 });
 
 module.exports = router;
